@@ -76,7 +76,7 @@ export const styles = /*css*/ `
     font-weight: 500;
     font-size: 1.25rem;
     cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -87,12 +87,13 @@ export const styles = /*css*/ `
     overflow: hidden;
   }
   button:hover {
-    transform: translateY(-4px) scale(1.02);
+    transform: translateY(-8px) scale(1.05);
     background: linear-gradient(135deg, #9061ff, #8b5cf6);
-    box-shadow: 0 8px 24px rgba(139, 92, 246, 0.4);
+    box-shadow: 0 12px 32px rgba(139, 92, 246, 0.5);
   }
   button:active {
-    transform: translateY(0) scale(0.98);
+    transform: translateY(-2px) scale(0.95);
+    box-shadow: 0 6px 16px rgba(139, 92, 246, 0.4);
   }
   #copyAll {
     background: linear-gradient(135deg, #7c3aed, #6d28d9);
@@ -109,12 +110,11 @@ export const styles = /*css*/ `
   }
   .output-group {
     opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.3s ease;
+    transform: translateY(20px);
   }
   .output-group.visible {
     opacity: 1;
-    pointer-events: auto;
+    transform: translateY(0);
   }
   ::placeholder {
     color: #4a4a57;
@@ -142,27 +142,33 @@ export const styles = /*css*/ `
       font-size: 1.2rem;
     }
   }
+  .success-flash {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.8);
+    pointer-events: none;
+    opacity: 0;
+  }
   .progress-ring {
     position: absolute;
-    inset: -4px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 80%;
+    height: 80%;
+    border: 4px solid rgba(255, 255, 255, 0.2);
+    border-top-color: white;
     border-radius: 50%;
-    border: 4px solid transparent;
-    border-left-color: rgba(139, 92, 246, 0.8);
-    opacity: 0;
     pointer-events: none;
+    opacity: 0;
   }
-
   @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
-  }
-
-  .success-flash {
-    position: absolute;
-    inset: 0;
-    border-radius: 50%;
-    background: linear-gradient(135deg, rgba(139, 92, 246, 0.4), rgba(124, 58, 237, 0.4));
-    opacity: 0;
-    pointer-events: none;
   }
 `; 

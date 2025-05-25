@@ -6,8 +6,15 @@ A Cloudflare Workers application that helps format health news articles for soci
 
 - 🔍 Scrapes article information from major Canadian news sources
 - 📝 Extracts headlines and cleans up URLs
-- 🖼️ Retrieves article preview images
-- 📋 One-click copying of formatted content
+- 🖼️ Retrieves high-quality article preview images with:
+  - Resolution optimization for each news source
+  - Secure CORS-enabled image proxy
+  - Reliable PNG conversion for clipboard compatibility
+- 📋 One-click sequential copying of:
+  - Formatted article text
+  - Article title
+  - Original URL
+  - Article image (as PNG)
 - 💫 Smooth animations and loading states
 - 📱 Responsive design for all devices
 
@@ -42,6 +49,25 @@ src/
   │   ├── constants.js     # Shared constants
   │   └── response.js      # Response helpers
 ```
+
+## Technical Details
+
+### Image Processing
+
+The application handles image processing in several stages:
+
+1. **Scraping**: Extracts the highest quality image URL available from the article
+2. **Optimization**: Adjusts image parameters (resolution, quality) based on the news source
+3. **Proxy**: Routes image requests through a CORS-enabled Cloudflare Worker endpoint
+4. **Client-side**: 
+   - Loads images through the proxy for cross-origin compatibility
+   - Uses canvas for reliable PNG conversion
+   - Implements sequential copying with visual feedback
+
+### API Endpoints
+
+- `/api/healthwatchify`: Main article processing endpoint
+- `/api/proxy-image`: CORS-enabled image proxy with caching
 
 ## Development
 

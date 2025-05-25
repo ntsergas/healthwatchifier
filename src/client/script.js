@@ -24,13 +24,13 @@ export const clientScript = /*javascript*/ `
     // Start spinning animation
     gsap.to(ring, {
       opacity: 1,
-      duration: 0.3,
+      duration: 0.4,
       ease: "power2.out"
     });
     
     gsap.to(ring, {
       rotation: 360,
-      duration: 2,
+      duration: 1.5,
       ease: "none",
       repeat: -1
     });
@@ -52,21 +52,41 @@ export const clientScript = /*javascript*/ `
       flash.className = 'success-flash';
       button.appendChild(flash);
       
+      // Enhanced success animation
       gsap.to(flash, {
-        opacity: 1,
-        duration: 0.3,
+        opacity: 0.8,
+        scale: 1.5,
+        duration: 0.5,
         ease: "power2.out",
         yoyo: true,
         repeat: 1,
         onComplete: () => flash.remove()
       });
 
-      // Update output
+      // Update output with a nice fade
+      gsap.to(outputGroup, {
+        opacity: 1,
+        y: 0,
+        duration: 0.6,
+        ease: "back.out(1.4)"
+      });
+
+      // Set content
       $("out").value = data.text;
       $("title").value = data.title;
       if (data.image) {
         $("preview").src = data.image;
         $("preview").style.display = "block";
+        $("preview").style.opacity = 0;
+        $("preview").style.transform = "scale(0.95) translateY(10px)";
+        
+        gsap.to($("preview"), {
+          opacity: 1,
+          scale: 1,
+          y: 0,
+          duration: 0.6,
+          ease: "back.out(1.4)"
+        });
       }
       $("out").style.opacity = 1;
       outputGroup.classList.add('visible');
@@ -82,34 +102,141 @@ export const clientScript = /*javascript*/ `
       $("out").value = "❌ Error: " + e.message;
       $("out").style.opacity = 1;
       outputGroup.classList.add('visible');
+      
+      // Error shake animation
+      gsap.to(button, {
+        x: [-10, 10, -10, 10, 0],
+        duration: 0.5,
+        ease: "power1.inOut"
+      });
     }
   };
 
   $("copyAll").onclick = async () => {
-    const text = $("out").value;
-    if (!text) return;
+    const output = $("out").value;
+    const title = $("title").value;
+    const url = $("link").value;
+    const img = $("preview");
+    
+    if (!output) return;
     
     const button = $("copyAll");
     
     try {
-      await navigator.clipboard.writeText(text);
-      
-      // Show success flash
-      const flash = document.createElement('div');
-      flash.className = 'success-flash';
-      button.appendChild(flash);
-      
-      gsap.to(flash, {
-        opacity: 1,
-        duration: 0.3,
-        ease: "power2.out",
+      // Copy in sequence: Output, Title, URL, Image
+      // 1. Copy Output
+      await navigator.clipboard.writeText(output);
+      button.textContent = "Output Copied!";
+      gsap.to(button, {
+        scale: 1.15,
+        duration: 0.2,
+        ease: "back.out(3)",
         yoyo: true,
-        repeat: 1,
-        onComplete: () => flash.remove()
+        repeat: 1
       });
+      await new Promise(resolve => setTimeout(resolve, 540));
+
+      // 2. Copy Title if exists
+      if (title) {
+        await navigator.clipboard.writeText(title);
+        button.textContent = "Title Copied!";
+        gsap.to(button, {
+          scale: 1.15,
+          duration: 0.2,
+          ease: "back.out(3)",
+          yoyo: true,
+          repeat: 1
+        });
+        await new Promise(resolve => setTimeout(resolve, 540));
+      }
+
+      // 3. Copy URL if exists
+      if (url) {
+        await navigator.clipboard.writeText(url);
+        button.textContent = "URL Copied!";
+        gsap.to(button, {
+          scale: 1.15,
+          duration: 0.2,
+          ease: "back.out(3)",
+          yoyo: true,
+          repeat: 1
+        });
+        await new Promise(resolve => setTimeout(resolve, 540));
+      }
+
+      // 4. Copy Image if exists and visible
+      if (img.src && img.style.display !== "none") {
+        button.textContent = "Copying Image...";
+        try {
+          // Create a new image using our proxy
+          const proxyUrl = "/api/proxy-image?url=" + encodeURIComponent(img.src);
+          const loadedImage = await new Promise((resolve, reject) => {
+            const tempImg = new Image();
+            tempImg.crossOrigin = "anonymous";
+            tempImg.onload = () => resolve(tempImg);
+            tempImg.onerror = reject;
+            tempImg.src = proxyUrl;
+          });
+
+          // Create a canvas element
+          const canvas = document.createElement('canvas');
+          canvas.width = loadedImage.naturalWidth;
+          canvas.height = loadedImage.naturalHeight;
+          
+          // Draw the image onto the canvas
+          const ctx = canvas.getContext('2d');
+          ctx.drawImage(loadedImage, 0, 0);
+          
+          // Convert to PNG blob
+          const blob = await new Promise(resolve => {
+            canvas.toBlob(resolve, 'image/png', 1.0);
+          });
+          
+          // Copy to clipboard
+          await navigator.clipboard.write([
+            new ClipboardItem({
+              'image/png': blob
+            })
+          ]);
+          
+          button.textContent = "Image Copied!";
+          gsap.to(button, {
+            scale: 1.15,
+            duration: 0.2,
+            ease: "back.out(3)",
+            yoyo: true,
+            repeat: 1
+          });
+        } catch (e) {
+          console.error("Failed to copy image:", e);
+          button.textContent = "Image Failed!";
+          gsap.to(button, {
+            keyframes: [
+              { rotate: -2 },
+              { rotate: 2 },
+              { rotate: -2 },
+              { rotate: 2 },
+              { rotate: 0 }
+            ],
+            duration: 0.3,
+            ease: "power1.inOut"
+          });
+        }
+      }
+
+      // Reset button text after all operations
+      setTimeout(() => {
+        button.textContent = "Copy All";
+        gsap.to(button, {
+          scale: 1,
+          duration: 0.2,
+          ease: "power1.out"
+        });
+      }, 3000);
       
     } catch (e) {
       alert("Failed to copy: " + e.message);
+      button.textContent = "Copy All";
     }
   };
 `; 
