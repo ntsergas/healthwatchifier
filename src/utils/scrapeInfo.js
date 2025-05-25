@@ -103,6 +103,14 @@ function getHighQualityImageUrl(imgUrl, host) {
                   .replace(/quality=\d+/, 'quality=90');
     }
     
+    // The Trillium (Village Media)
+    if (url.hostname.includes('vmcdn.ca')) {
+      return imgUrl.replace(/;w=\d+/, ';w=1200')
+                  .replace(/;h=\d+/, ';h=800')
+                  .replace(/;mode=crop/, ';mode=crop')
+                  .replace(/;quality=\d+/, ';quality=85');
+    }
+    
     // CBC
     if (url.hostname.includes('cbc.ca')) {
       return imgUrl.replace(/\/derivatives\/\w+\//, '/derivatives/16x9_1180/')
@@ -145,6 +153,7 @@ export async function scrapeInfo(url, cf = { cacheTtl: 300 }, depth = 0, visited
   const host = new URL(url).hostname;
   const isCBC = host.endsWith("cbc.ca");
   const isPM = POSTMEDIA.some(d => host.endsWith(d));
+  const isTrillium = host.endsWith("thetrillium.ca");
 
   const headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
@@ -199,6 +208,86 @@ export async function scrapeInfo(url, cf = { cacheTtl: 300 }, depth = 0, visited
 
   if (isCBC && /<title>\s*Access Denied/i.test(html)) {
     html = await (await fetch(url, { redirect: "follow", cf })).text();
+  }
+
+  // The Trillium-specific parser
+  if (isTrillium) {
+    // First try: meta tags with property attribute
+    const ogTitle = (html.match(/<meta[^>]+property=["']og:title["'][^>]*content=["']([^"']+)["']/i) || [])[1];
+    const ogImage = (html.match(/<meta[^>]+property=["']og:image["'][^>]*content=["']([^"']+)["']/i) || [])[1];
+    
+    if (ogTitle && ogImage && !ogImage.includes('logo_thetrillium')) {
+      return { 
+        headline: cleanupHeadline(ogTitle, host),
+        image: getHighQualityImageUrl(ogImage, host),
+        url 
+      };
+    }
+
+    // Second try: meta tags with name attribute
+    const nameTitle = (html.match(/<meta[^>]+name=["']title["'][^>]*content=["']([^"']+)["']/i) || [])[1];
+    const nameImage = (html.match(/<meta[^>]+name=["']image["'][^>]*content=["']([^"']+)["']/i) || [])[1];
+    
+    if (nameTitle && nameImage && !nameImage.includes('logo_thetrillium')) {
+      return { 
+        headline: cleanupHeadline(nameTitle, host),
+        image: getHighQualityImageUrl(nameImage, host),
+        url 
+      };
+    }
+
+    // Third try: article content
+    const articleMatch = html.match(/<article[^>]*>([\s\S]*?)<\/article>/i);
+    if (articleMatch) {
+      const articleHtml = articleMatch[1];
+      const titleMatch = articleHtml.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
+      
+      // Look for images in the article, excluding logos
+      const imgMatches = articleHtml.matchAll(/<img[^>]+src=["']([^"']+)["']/gi);
+      let articleImage = "";
+      for (const match of imgMatches) {
+        if (!match[1].includes('logo_thetrillium')) {
+          articleImage = match[1];
+          break;
+        }
+      }
+      
+      if (titleMatch && articleImage) {
+        return {
+          headline: cleanupHeadline(titleMatch[1].replace(/<[^>]*>/g, '').trim(), host),
+          image: getHighQualityImageUrl(articleImage, host),
+          url
+        };
+      }
+    }
+
+    // Fourth try: title tag and first non-logo image
+    const titleTag = (html.match(/<title>([^<]+)<\/title>/i) || [])[1];
+    const imgMatches = html.matchAll(/<img[^>]+src=["']([^"']+)["']/gi);
+    let firstNonLogo = "";
+    for (const match of imgMatches) {
+      if (!match[1].includes('logo_thetrillium')) {
+        firstNonLogo = match[1];
+        break;
+      }
+    }
+
+    if (titleTag && firstNonLogo) {
+      return {
+        headline: cleanupHeadline(titleTag.replace(/\s*[-|]\s*The Trillium\s*$/, ''), host),
+        image: getHighQualityImageUrl(firstNonLogo, host),
+        url
+      };
+    }
+
+    // If all attempts fail, try to at least get a title
+    if (titleTag) {
+      return {
+        headline: cleanupHeadline(titleTag.replace(/\s*[-|]\s*The Trillium\s*$/, ''), host),
+        image: "",
+        url
+      };
+    }
   }
 
   // 🧠 Postmedia-specific parser
