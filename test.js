@@ -12,6 +12,7 @@ const urls = [
   'https://globalnews.ca/news/11181405/arsenic-rice-what-to-know/',
   'https://www.theglobeandmail.com/canada/article-ontario-budget-2025-deficit-tariffs-housing-highlights/',
   'https://healthydebate.ca/2025/05/topic/license-to-kill-the-pandemic-on-our-roads/',
+  'https://www.thetrillium.ca/news/health/more-than-25000-students-suspended-this-school-year-for-out-of-date-vaccination-records-10684847',
 
   // Guardian articles
   'https://www.theguardian.com/science/2025/may/23/blood-test-could-speed-diagnosis-rare-diseases-babies',
