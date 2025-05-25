@@ -1,0 +1,35 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+# Run full test suite with coverage
+npm test -- --coverage
+
+# Build the project to check for any build errors
+npm run build
+
+# Check for proper error handling in scraping functions
+if ! grep -r "try.*catch" src/utils/scrapeInfo.js >/dev/null; then
+  echo "Warning: Missing try-catch blocks in scrapeInfo.js"
+  exit 1
+fi
+
+# Check for proper CORS headers in API endpoints
+if ! grep -r "Access-Control-Allow-Origin" src/ >/dev/null; then
+  echo "Warning: Missing CORS headers in API responses"
+  exit 1
+fi
+
+# Verify required configuration
+required_vars="CLOUDFLARE_API_TOKEN"
+for var in $required_vars; do
+  if ! grep -q "$var" wrangler.toml && ! grep -q "$var" .env; then
+    echo "Error: Missing required environment variable: $var"
+    exit 1
+  fi
+done
+
+# Check for proper cleanup in fetch operations
+if grep -r "AbortController" src/ | grep -v "clearTimeout"; then
+  echo "Warning: Found AbortController usage without proper cleanup"
+  exit 1
+fi 

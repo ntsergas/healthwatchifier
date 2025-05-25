@@ -1,11 +1,7 @@
 name = "healthwatchifier"
 main = "src/index.js"
-compatibility_date = "2025-05-22"
+compatibility_date = "2025-05-08"
 
-route = "strikethroughediting.ca/*"
-account_id = "22bf090c764ca412c668ef39506db0f2"
-zone_id = "8171e44a5c73e1d88505de99f0bd4334"
-
-# Optional: custom build/upload settings
-# [build]
-# command = "npm run build"
+# Enable observability
+[observability]
+enabled = true 

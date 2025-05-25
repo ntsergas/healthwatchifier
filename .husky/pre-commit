@@ -1,0 +1,29 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+# Run lint-staged to handle linting and formatting
+npx lint-staged
+
+# Run tests
+npm test -- --run
+
+# Check for hardcoded URLs that should be in constants
+if git diff --cached --name-only | xargs grep -l "https\?://[^/]*\.\(cbc\|postmedia\|globalnews\|theglobeandmail\)\."; then
+  echo "Warning: Found hardcoded news site URLs. Consider moving them to the POSTMEDIA constant."
+  exit 1
+fi
+
+# Check for potential memory leaks in fetch retries
+if git diff --cached --name-only | xargs grep -l "new AbortController()" | xargs grep -L "clearTimeout"; then
+  echo "Warning: Found AbortController without clearTimeout. Make sure to clean up timeouts."
+  exit 1
+fi
+
+# Check bundle size (adjusted for Cloudflare Workers limit)
+if [ -f "dist/worker.js" ]; then
+  size=$(stat -f%z "dist/worker.js" 2>/dev/null || stat -c%s "dist/worker.js")
+  if [ "$size" -gt 1048576 ]; then  # 1MB Cloudflare Worker limit
+    echo "Error: Bundle size exceeds Cloudflare Worker limit of 1MB"
+    exit 1
+  fi
+fi 

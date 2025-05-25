@@ -1,3 +1,5 @@
+// import puppeteer from '@cloudflare/puppeteer';
+
 const decode = (s = "") =>
   s
     .replace(/&amp;/g, "&")
@@ -132,6 +134,7 @@ function getHighQualityImageUrl(imgUrl, host) {
   }
 }
 
+// Main scraping function
 export async function scrapeInfo(url, cf = { cacheTtl: 300 }, depth = 0, visited = new Set()) {
   url = sanitizeUrl(url);
 
@@ -164,8 +167,9 @@ export async function scrapeInfo(url, cf = { cacheTtl: 300 }, depth = 0, visited
     headers["Sec-Fetch-Site"] = "same-origin";
   }
 
+  // Original scraping logic continues unchanged...
   const ctrl = new AbortController();
-  const tid = setTimeout(() => ctrl.abort("timeout"), isPM ? 8000 : 4000); // Longer timeout for Postmedia
+  const tid = setTimeout(() => ctrl.abort("timeout"), isPM ? 8000 : 4000);
 
   let html = "";
   try {

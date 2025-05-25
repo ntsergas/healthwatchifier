@@ -1,0 +1,1 @@
+export const TAGLINE = "𝗠𝗼𝗿𝗲 𝗵𝗲𝗮𝗹𝘁𝗵 𝗻𝗲𝘄𝘀 ⇢ CanadaHealthwatch.ca 🍁"; 
