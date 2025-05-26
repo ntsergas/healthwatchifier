@@ -1,5 +1,7 @@
 // import puppeteer from '@cloudflare/puppeteer';
 
+import { PUBLICATION_NAMES } from './constants.js';
+
 const decode = (s = "") =>
   s
     .replace(/&amp;/g, "&")
@@ -19,7 +21,8 @@ const POSTMEDIA = [
   "calgarysun.com", "edmontonsun.com", "ottawasun.com", "canada.com",
 ];
 
-function sanitizeUrl(input) {
+// Helper functions
+export function sanitizeUrl(input) {
   try {
     const u = new URL(input);
     for (const key of Array.from(u.searchParams.keys())) {
@@ -77,7 +80,7 @@ function cleanupHeadline(headline, host) {
   
   headline = headline.replace(/\s+/g, " ").trim()
     // Remove site-specific suffixes
-    .replace(/\s*\|\s*(CBC News|CBC Radio|CBC|Globalnews\.ca|CTV News|Toronto Star|The Globe and Mail|National Post|National|Global News)\s*$/i, "")
+    .replace(/\s*\|\s*(CBC News|CBC Radio|CBC|Globalnews\.ca|CTV News|Toronto Star|The Globe and Mail|National Post|National|Vancouver Sun|Edmonton Journal|Montreal Gazette|The Trillium)\s*$/i, "")
     .replace(/\s+-\s+(National|Healthy Debate|The Globe and Mail)\s*$/i, "")
     // Remove common prefixes
     .replace(/^(WATCH|LISTEN|READ|EXCLUSIVE|UPDATE):\s+/i, "")
@@ -142,6 +145,104 @@ function getHighQualityImageUrl(imgUrl, host) {
   }
 }
 
+// Helper function to get publication name from URL
+function getPublicationName(url) {
+  try {
+    const hostname = new URL(url).hostname;
+    // Remove 'www.' prefix if present
+    const host = hostname.replace(/^www\./, '');
+    const domain = host.split('.').slice(-2).join('.');
+    
+    // Check for exact domain match
+    if (PUBLICATION_NAMES[host]) {
+      return PUBLICATION_NAMES[host];
+    }
+
+    // Check for domain match (e.g. nationalpost.com)
+    if (PUBLICATION_NAMES[domain]) {
+      return PUBLICATION_NAMES[domain];
+    }
+    
+    // Check for subdomain matches (e.g. montreal.ctvnews.ca -> CTV News)
+    for (const [key, value] of Object.entries(PUBLICATION_NAMES)) {
+      if (host.endsWith('.' + key) || host.endsWith(key)) {
+        return value;
+      }
+    }
+    
+    // Return null if no match found
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+// Helper function to detect article type (news vs opinion)
+function detectArticleType(url, html, pick) {
+  try {
+    // 1. Check URL patterns
+    const urlLower = url.toLowerCase();
+    if (urlLower.includes('/opinion/') || 
+        urlLower.includes('/analysis/') || 
+        urlLower.includes('/perspectives/') ||
+        urlLower.includes('/perspective/') ||
+        urlLower.includes('/op-ed/')) {
+      return 'opinion';
+    }
+
+    // 2. Check meta tags
+    const articleType = pick('article:type', 'og:type', 'article:section', 'article:genre');
+    if (articleType) {
+      const typeLower = articleType.toLowerCase();
+      if (typeLower.includes('opinion') || 
+          typeLower.includes('analysis') || 
+          typeLower.includes('perspective') ||
+          typeLower.includes('editorial') ||
+          typeLower.includes('commentary')) {
+        return 'opinion';
+      }
+    }
+
+    // 3. Check JSON-LD data
+    const jsonLdMatch = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i);
+    if (jsonLdMatch) {
+      try {
+        const cleaned = jsonLdMatch[1].replace(/[\x00-\x1F\x7F]/g, "");
+        const json = JSON.parse(cleaned);
+        
+        // Check article type/genre in JSON-LD
+        const articleSection = json.articleSection || json.genre || '';
+        if (typeof articleSection === 'string' && 
+            (articleSection.toLowerCase().includes('opinion') ||
+             articleSection.toLowerCase().includes('analysis') ||
+             articleSection.toLowerCase().includes('perspective'))) {
+          return 'opinion';
+        }
+      } catch (_) {}
+    }
+
+    // 4. Check common article markers in HTML
+    const markers = html.match(/<div[^>]*class="[^"]*(?:article-type|content-type|article-label)[^"]*"[^>]*>([^<]+)<\/div>/i) ||
+                   html.match(/<span[^>]*class="[^"]*(?:article-type|content-type|article-label)[^"]*"[^>]*>([^<]+)<\/span>/i);
+    if (markers) {
+      const markerText = markers[1].toLowerCase();
+      if (markerText.includes('opinion') || 
+          markerText.includes('analysis') || 
+          markerText.includes('perspective') ||
+          markerText.includes('editorial') ||
+          markerText.includes('commentary')) {
+        return 'opinion';
+      }
+    }
+
+    // Default to 'news' if no opinion markers found
+    return 'news';
+  } catch (e) {
+    console.warn('Error detecting article type:', e);
+    return 'news'; // Default to news if detection fails
+  }
+}
+
 // Main scraping function
 export async function scrapeInfo(url, cf = { cacheTtl: 300 }, depth = 0, visited = new Set()) {
   url = sanitizeUrl(url);
@@ -150,10 +251,15 @@ export async function scrapeInfo(url, cf = { cacheTtl: 300 }, depth = 0, visited
   if (visited.has(url)) throw new Error("repeat url");
   visited.add(url);
 
-  const host = new URL(url).hostname;
+  const urlObj = new URL(url);
+  const host = urlObj.hostname.replace(/^www\./, '');
   const isCBC = host.endsWith("cbc.ca");
   const isPM = POSTMEDIA.some(d => host.endsWith(d));
-  const isTrillium = host.endsWith("thetrillium.ca");
+  const isTrillium = host === "thetrillium.ca";
+  const isCP = host === "thecanadianpressnews.ca";
+
+  // Get publication name early
+  let publication = getPublicationName(url);
 
   const headers = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
@@ -176,7 +282,6 @@ export async function scrapeInfo(url, cf = { cacheTtl: 300 }, depth = 0, visited
     headers["Sec-Fetch-Site"] = "same-origin";
   }
 
-  // Original scraping logic continues unchanged...
   const ctrl = new AbortController();
   const tid = setTimeout(() => ctrl.abort("timeout"), isPM ? 8000 : 4000);
 
@@ -206,88 +311,24 @@ export async function scrapeInfo(url, cf = { cacheTtl: 300 }, depth = 0, visited
     clearTimeout(tid);
   }
 
-  if (isCBC && /<title>\s*Access Denied/i.test(html)) {
-    html = await (await fetch(url, { redirect: "follow", cf })).text();
+  // Special handling for Associated Press articles on The Canadian Press website
+  if (isCP) {
+    // Look for Associated Press byline in multiple places
+    const bylineMatch = html.match(/By\s+([^<]+)\s+The\s+Associated\s+Press/i) ||
+                       html.match(/<div[^>]*class="[^"]*byline[^"]*"[^>]*>([^<]+)<\/div>/i) ||
+                       html.match(/<div[^>]*class="[^"]*author[^"]*"[^>]*>([^<]+)<\/div>/i);
+    
+    // Also check the article content for AP attribution
+    const apMention = html.match(/By\s+([^<]+)\s+The\s+Associated\s+Press/i) ||
+                     html.match(/The\s+Associated\s+Press/i);
+    
+    if ((bylineMatch && bylineMatch[1].toLowerCase().includes('associated press')) || apMention) {
+      publication = "Associated Press";
+    }
   }
 
-  // The Trillium-specific parser
-  if (isTrillium) {
-    // First try: meta tags with property attribute
-    const ogTitle = (html.match(/<meta[^>]+property=["']og:title["'][^>]*content=["']([^"']+)["']/i) || [])[1];
-    const ogImage = (html.match(/<meta[^>]+property=["']og:image["'][^>]*content=["']([^"']+)["']/i) || [])[1];
-    
-    if (ogTitle && ogImage && !ogImage.includes('logo_thetrillium')) {
-      return { 
-        headline: cleanupHeadline(ogTitle, host),
-        image: getHighQualityImageUrl(ogImage, host),
-        url 
-      };
-    }
-
-    // Second try: meta tags with name attribute
-    const nameTitle = (html.match(/<meta[^>]+name=["']title["'][^>]*content=["']([^"']+)["']/i) || [])[1];
-    const nameImage = (html.match(/<meta[^>]+name=["']image["'][^>]*content=["']([^"']+)["']/i) || [])[1];
-    
-    if (nameTitle && nameImage && !nameImage.includes('logo_thetrillium')) {
-      return { 
-        headline: cleanupHeadline(nameTitle, host),
-        image: getHighQualityImageUrl(nameImage, host),
-        url 
-      };
-    }
-
-    // Third try: article content
-    const articleMatch = html.match(/<article[^>]*>([\s\S]*?)<\/article>/i);
-    if (articleMatch) {
-      const articleHtml = articleMatch[1];
-      const titleMatch = articleHtml.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
-      
-      // Look for images in the article, excluding logos
-      const imgMatches = articleHtml.matchAll(/<img[^>]+src=["']([^"']+)["']/gi);
-      let articleImage = "";
-      for (const match of imgMatches) {
-        if (!match[1].includes('logo_thetrillium')) {
-          articleImage = match[1];
-          break;
-        }
-      }
-      
-      if (titleMatch && articleImage) {
-        return {
-          headline: cleanupHeadline(titleMatch[1].replace(/<[^>]*>/g, '').trim(), host),
-          image: getHighQualityImageUrl(articleImage, host),
-          url
-        };
-      }
-    }
-
-    // Fourth try: title tag and first non-logo image
-    const titleTag = (html.match(/<title>([^<]+)<\/title>/i) || [])[1];
-    const imgMatches = html.matchAll(/<img[^>]+src=["']([^"']+)["']/gi);
-    let firstNonLogo = "";
-    for (const match of imgMatches) {
-      if (!match[1].includes('logo_thetrillium')) {
-        firstNonLogo = match[1];
-        break;
-      }
-    }
-
-    if (titleTag && firstNonLogo) {
-      return {
-        headline: cleanupHeadline(titleTag.replace(/\s*[-|]\s*The Trillium\s*$/, ''), host),
-        image: getHighQualityImageUrl(firstNonLogo, host),
-        url
-      };
-    }
-
-    // If all attempts fail, try to at least get a title
-    if (titleTag) {
-      return {
-        headline: cleanupHeadline(titleTag.replace(/\s*[-|]\s*The Trillium\s*$/, ''), host),
-        image: "",
-        url
-      };
-    }
+  if (isCBC && /<title>\s*Access Denied/i.test(html)) {
+    html = await (await fetch(url, { redirect: "follow", cf })).text();
   }
 
   // 🧠 Postmedia-specific parser
@@ -304,10 +345,14 @@ export async function scrapeInfo(url, cf = { cacheTtl: 300 }, depth = 0, visited
           : json.image?.url?.trim();
 
         if (head && img) {
+          // Get article type before returning
+          const articleType = detectArticleType(url, html, pick);
           return {
             headline: cleanupHeadline(head, host),
             image: getHighQualityImageUrl(img, host),
-            url
+            url,
+            publication,
+            articleType
           };
         }
       } catch (_) {}
@@ -318,10 +363,14 @@ export async function scrapeInfo(url, cf = { cacheTtl: 300 }, depth = 0, visited
     const ogImage = (html.match(/<meta[^>]+property=["']og:image["'][^>]*content=["']([^"']+)["']/i) || [])[1];
     
     if (ogTitle && ogImage) {
+      // Get article type before returning
+      const articleType = detectArticleType(url, html, pick);
       return { 
         headline: cleanupHeadline(ogTitle, host),
         image: getHighQualityImageUrl(ogImage, host),
-        url 
+        url,
+        publication,
+        articleType
       };
     }
 
@@ -333,17 +382,58 @@ export async function scrapeInfo(url, cf = { cacheTtl: 300 }, depth = 0, visited
       const imgMatch = articleHtml.match(/<img[^>]+src=["']([^"']+)["']/i);
       
       if (titleMatch && imgMatch) {
+        // Get article type before returning
+        const articleType = detectArticleType(url, html, pick);
         return {
           headline: cleanupHeadline(titleMatch[1].replace(/<[^>]*>/g, '').trim(), host),
           image: getHighQualityImageUrl(imgMatch[1], host),
-          url
+          url,
+          publication,
+          articleType
         };
       }
     }
   }
 
-  const ogTitle = (html.match(/<meta[^>]+property=["']og:title["'][^>]*content=["']([^"']+)["']/i) || [])[1];
-  const titleTag = (html.match(/<title>([^<]+)<\/title>/i) || [])[1];
+  // For Postmedia sites, try to get the headline from JSON-LD first
+  let head = "";
+  if (isPM || isTrillium) {
+    // First try to get the title from meta tags for Postmedia sites
+    const titleMatch = html.match(/<title>([^<]+)<\/title>/i);
+    if (titleMatch) {
+      head = titleMatch[1].replace(/\s*\|\s*National Post$/, '');
+    }
+
+    // Also try og:title as backup
+    if (!head) {
+      const ogTitleMatch = html.match(/<meta[^>]+property=["']og:title["'][^>]*content=["']([^"']+)["']/i);
+      if (ogTitleMatch) {
+        head = ogTitleMatch[1];
+      }
+    }
+
+    // Try JSON-LD as last resort
+    if (!head) {
+      const jsonLdMatch = html.match(/<script type="application\/ld\+json">\s*({[^<]+})\s*<\/script>/i);
+      if (jsonLdMatch) {
+        try {
+          const data = JSON.parse(jsonLdMatch[1]);
+          if (data["@type"] === "NewsArticle" && data.headline) {
+            head = data.headline;
+          }
+        } catch (e) {
+          console.error("Failed to parse JSON-LD:", e.message);
+        }
+      }
+    }
+  }
+
+  // If still no headline, try other meta tags
+  if (!head) {
+    const ogTitle = (html.match(/<meta[^>]+property=["']og:title["'][^>]*content=["']([^"']+)["']/i) || [])[1];
+    const titleTag = (html.match(/<title>([^<]+)<\/title>/i) || [])[1];
+    head = ogTitle || titleTag;
+  }
 
   function pick(...names) {
     for (const n of names) {
@@ -360,16 +450,60 @@ export async function scrapeInfo(url, cf = { cacheTtl: 300 }, depth = 0, visited
     return match ? match[2].trim() : "";
   }
 
-  let head = ogTitle || pick("twitter:title") || pickRev("og:title") || titleTag;
+  // If still no headline, try other meta tags
+  if (!head || head.length < 15) {
+    head = pick("twitter:title") || pickRev("og:title");
+  }
 
+  // If still no headline, try h1
   if (!head || head.length < 15 || /&#8217;?$/i.test(head) || /don$/.test(head) || head === "(untitled)") {
     const h1 = html.match(/<h1[^>]*>([\s\S]+?)<\/h1>/i);
     if (h1) head = h1[1].replace(/<[^>]*>/g, "").trim();
   }
 
-  let img = pick("twitter:image", "twitter:image:src", "og:image", "og:image:url", "og:image:secure_url") ||
-            pickRev("twitter:image") ||
-            pickRev("og:image");
+  let img = "";
+  
+  // For Postmedia sites, try to get image from JSON-LD first
+  if (isPM || isTrillium) {
+    const jsonLd = html.match(/<script type="application\/ld\+json">\s*({[\s\S]+?})\s*<\/script>/i);
+    if (jsonLd) {
+      try {
+        const data = JSON.parse(jsonLd[1]);
+        if (data.image && Array.isArray(data.image) && data.image[0] && data.image[0].url) {
+          img = data.image[0].url;
+        }
+      } catch (e) {
+        console.error("Failed to parse JSON-LD for image:", e.message);
+      }
+    }
+  }
+
+  // If no image from JSON-LD, try meta tags
+  if (!img) {
+    img = pick("twitter:image", "twitter:image:src", "og:image", "og:image:url", "og:image:secure_url") ||
+          pickRev("twitter:image") ||
+          pickRev("og:image");
+  }
+
+  // For Postmedia sites, try to get image from link tags
+  if ((!img || img.includes('scorecardresearch.com')) && isPM) {
+    const linkMatch = html.match(/<link[^>]+imagesrcset=["']([^"']+)["']/i);
+    if (linkMatch) {
+      const srcset = linkMatch[1];
+      const match = srcset.match(/https:\/\/smartcdn\.gprod\.postmedia\.digital\/[^,\s]+/);
+      if (match) {
+        img = match[0];
+      }
+    }
+  }
+
+  // For The Trillium, try to get image from vmcdn.ca
+  if ((!img || img.includes('width=device-width')) && isTrillium) {
+    const vmcdnMatch = html.match(/https:\/\/www\.vmcdn\.ca\/[^"'\s]+/i);
+    if (vmcdnMatch) {
+      img = vmcdnMatch[0];
+    }
+  }
 
   if (!img || img.length < 5) {
     // Try Guardian-specific image pattern first
@@ -391,7 +525,7 @@ export async function scrapeInfo(url, cf = { cacheTtl: 300 }, depth = 0, visited
     }
   }
 
-  if (!img && isPM) {
+  if (!img && isCBC) {
     const tm = html.match(/"thumbnailUrl"\s*:\s*"([^"]+)"/i);
     if (tm) img = tm[1];
   }
@@ -399,9 +533,15 @@ export async function scrapeInfo(url, cf = { cacheTtl: 300 }, depth = 0, visited
   if (img?.startsWith("/")) img = new URL(img, url).href;
   img = getHighQualityImageUrl(decode(img || "").trim(), host);
 
+  // Get article type
+  const articleType = detectArticleType(url, html, pick);
+
+  // Return with publication and article type
   return { 
     headline: cleanupHeadline(head, host),
     image: img,
-    url 
+    url,
+    publication,
+    articleType
   };
 } 

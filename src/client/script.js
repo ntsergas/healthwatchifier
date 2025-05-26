@@ -1,19 +1,61 @@
 export const clientScript = /*javascript*/ `
   const $ = id => document.getElementById(id);
   const outputGroup = document.querySelector('.output-group');
+  const publicationBadge = $("publication");
+  const publicationName = publicationBadge.querySelector('.publication-name');
+  const articleType = publicationBadge.querySelector('.article-type');
+
+  // URL sanitization function
+  function sanitizeUrl(input) {
+    try {
+      const u = new URL(input);
+      for (const key of Array.from(u.searchParams.keys())) {
+        const lower = key.toLowerCase();
+        if (
+          lower.startsWith("utm_") ||
+          lower === "cmp" ||
+          lower === "fbclid" ||
+          lower === "gclid" ||
+          lower.startsWith("mc_")
+        ) {
+          u.searchParams.delete(key);
+        }
+      }
+      return u.href;
+    } catch {
+      return input;
+    }
+  }
 
   // Show output group initially with 0 opacity
   outputGroup.style.display = 'block';
 
+  // Handle URL paste event
+  $("link").addEventListener('paste', (e) => {
+    // Wait for the paste to complete
+    setTimeout(() => {
+      const url = e.target.value.trim();
+      if (url) {
+        e.target.value = sanitizeUrl(url);
+      }
+    }, 0);
+  });
+
   $("go").onclick = async () => {
-    const url = $("link").value.trim();
+    let url = $("link").value.trim();
     if (!url) return alert("Please paste a URL first!");
+    
+    // Sanitize URL and update input field
+    url = sanitizeUrl(url);
+    $("link").value = url;
     
     // Reset output and show loading state
     $("out").value = "⏳ Fetching…";
     $("preview").style.display = "none";
     $("out").style.opacity = 0.5;
     outputGroup.classList.remove('visible');
+    publicationBadge.style.display = 'none';
+    publicationBadge.classList.remove('visible');
     
     // Create and animate progress ring
     const button = $("go");
@@ -74,6 +116,17 @@ export const clientScript = /*javascript*/ `
       // Set content
       $("out").value = data.text;
       $("title").value = data.title;
+      
+      // Handle publication badge
+      if (data.publication) {
+        publicationName.textContent = data.publication;
+        articleType.textContent = data.articleType || 'news';
+        publicationBadge.style.display = 'inline-flex';
+        setTimeout(() => publicationBadge.classList.add('visible'), 100);
+      } else {
+        publicationBadge.style.display = 'none';
+      }
+      
       if (data.image) {
         $("preview").src = data.image;
         $("preview").style.display = "block";
@@ -117,13 +170,15 @@ export const clientScript = /*javascript*/ `
     const title = $("title").value;
     const url = $("link").value;
     const img = $("preview");
+    const publication = publicationName.textContent;
+    const type = articleType.textContent;
     
     if (!output) return;
     
     const button = $("copyAll");
+    const COPY_DELAY = 540; // Time between copy operations in ms
     
     try {
-      // Copy in sequence: Output, Title, URL, Image
       // 1. Copy Output
       await navigator.clipboard.writeText(output);
       button.textContent = "Output Copied!";
@@ -134,9 +189,37 @@ export const clientScript = /*javascript*/ `
         yoyo: true,
         repeat: 1
       });
-      await new Promise(resolve => setTimeout(resolve, 540));
+      await new Promise(resolve => setTimeout(resolve, COPY_DELAY));
 
-      // 2. Copy Title if exists
+      // 2. Copy Publication if exists
+      if (publication && publicationBadge.style.display !== 'none') {
+        await navigator.clipboard.writeText(publication);
+        button.textContent = "Outlet Copied!";
+        gsap.to(button, {
+          scale: 1.15,
+          duration: 0.2,
+          ease: "back.out(3)",
+          yoyo: true,
+          repeat: 1
+        });
+        await new Promise(resolve => setTimeout(resolve, COPY_DELAY));
+      }
+
+      // 3. Copy Article Type if exists
+      if (type && publicationBadge.style.display !== 'none') {
+        await navigator.clipboard.writeText(type);
+        button.textContent = "Type Copied!";
+        gsap.to(button, {
+          scale: 1.15,
+          duration: 0.2,
+          ease: "back.out(3)",
+          yoyo: true,
+          repeat: 1
+        });
+        await new Promise(resolve => setTimeout(resolve, COPY_DELAY));
+      }
+
+      // 4. Copy Title if exists
       if (title) {
         await navigator.clipboard.writeText(title);
         button.textContent = "Title Copied!";
@@ -147,10 +230,10 @@ export const clientScript = /*javascript*/ `
           yoyo: true,
           repeat: 1
         });
-        await new Promise(resolve => setTimeout(resolve, 540));
+        await new Promise(resolve => setTimeout(resolve, COPY_DELAY));
       }
 
-      // 3. Copy URL if exists
+      // 5. Copy URL if exists
       if (url) {
         await navigator.clipboard.writeText(url);
         button.textContent = "URL Copied!";
@@ -161,10 +244,10 @@ export const clientScript = /*javascript*/ `
           yoyo: true,
           repeat: 1
         });
-        await new Promise(resolve => setTimeout(resolve, 540));
+        await new Promise(resolve => setTimeout(resolve, COPY_DELAY));
       }
 
-      // 4. Copy Image if exists and visible
+      // 6. Copy Image if exists and visible
       if (img.src && img.style.display !== "none") {
         button.textContent = "Copying Image...";
         try {

@@ -9,13 +9,15 @@ export async function handleHealthwatchify(request) {
       return errorResponse('No URL provided', 400);
     }
 
-    const { headline, image, url: cleanUrl } = await scrapeInfo(url);
+    const { headline, image, url: cleanUrl, publication, articleType } = await scrapeInfo(url);
     const text = `${headline} ${cleanUrl}\n\n${TAGLINE}`;
 
     return jsonResponse({
       title: headline,
       text,
-      image
+      image,
+      publication,
+      articleType
     });
 
   } catch (error) {
