@@ -78,18 +78,33 @@ async function fetchWithRetry(url, options, retries = 3, baseDelay = 1000) {
 function cleanupHeadline(headline, host) {
   if (!headline) return "(untitled)";
   
-  headline = headline.replace(/\s+/g, " ").trim()
-    // Remove site-specific suffixes
-    .replace(/\s*\|\s*(CBC News|CBC Radio|CBC|Globalnews\.ca|CTV News|Toronto Star|The Globe and Mail|National Post|National|Vancouver Sun|Edmonton Journal|Montreal Gazette|The Trillium)\s*$/i, "")
-    .replace(/\s+-\s+(National|Healthy Debate|The Globe and Mail)\s*$/i, "")
-    // Remove common prefixes
-    .replace(/^(WATCH|LISTEN|READ|EXCLUSIVE|UPDATE):\s+/i, "")
-    // Fix common encoding issues
+  console.log("Original headline:", headline);
+  
+  headline = headline.replace(/\s+/g, " ").trim();
+  console.log("After whitespace cleanup:", headline);
+  
+  // Remove site-specific suffixes
+  headline = headline.replace(/\s*\|\s*(CBC News|CBC Radio|CBC|Globalnews\.ca|CTV News|Toronto Star|The Globe and Mail|National Post|National|Vancouver Sun|Edmonton Journal|Montreal Gazette|The Trillium|Canada Healthwatch)\s*$/i, "");
+  console.log("After suffix removal:", headline);
+  
+  headline = headline.replace(/\s+-\s+(National|Healthy Debate|The Globe and Mail|Canada Healthwatch)\s*$/i, "");
+  console.log("After dash suffix removal:", headline);
+  
+  // Remove common prefixes
+  headline = headline.replace(/^(WATCH|LISTEN|READ|EXCLUSIVE|UPDATE|OPINION):\s+/i, "");
+  console.log("After prefix removal:", headline);
+  
+  // Fix common encoding issues
+  headline = headline
     .replace(/[\u2018\u2019]/g, "'")
     .replace(/[\u201C\u201D]/g, '"')
-    .replace(/\s*\|\s*$/g, "");
+    .replace(/\s*\|\s*$/g, "")
+    .replace(/\s*\.{3,}\s*$/g, "");
+  console.log("After encoding fixes:", headline);
 
-  return decode(headline);
+  const final = decode(headline);
+  console.log("Final headline:", final);
+  return final;
 }
 
 // Helper function to get high quality image URL
@@ -180,6 +195,14 @@ function getPublicationName(url) {
 // Helper function to detect article type (news vs opinion)
 function detectArticleType(url, html, pick) {
   try {
+    const urlObj = new URL(url);
+    const host = urlObj.hostname.replace(/^www\./, '');
+
+    // Always return 'opinion' for Policy Options
+    if (host === 'policyoptions.irpp.org') {
+      return 'opinion';
+    }
+
     // 1. Check URL patterns
     const urlLower = url.toLowerCase();
     if (urlLower.includes('/opinion/') || 
@@ -240,6 +263,159 @@ function detectArticleType(url, html, pick) {
   } catch (e) {
     console.warn('Error detecting article type:', e);
     return 'news'; // Default to news if detection fails
+  }
+}
+
+// Helper function to clean up author names
+function cleanupAuthor(author) {
+  if (!author || typeof author !== 'string') return author;
+  
+  return author
+    // Remove trailing publication suffixes
+    .replace(/\s+The\s+Associated\s+Press$/i, '')
+    .replace(/\s+-\s+ICI\.Radio-Canada\.ca$/i, '')
+    .replace(/\s+The\s+Canadian\s+Press$/i, '')
+    // Clean up common prefixes and suffixes
+    .replace(/^Zone\s+\w+\s+-\s+/i, '') // Remove "Zone Politique - " style prefixes
+    .replace(/^Author:\s*/i, '') // Remove "Author:" prefix
+    .trim();
+}
+
+// Helper function to detect article authors
+function detectAuthors(url, html, pick) {
+  try {
+    // Special cases: these domains always return TKTKTK
+    const urlObj = new URL(url);
+    const host = urlObj.hostname.replace(/^www\./, '');
+    if (host === 'justanoldcountrydoctor.com' || host === 'cidrap.umn.edu') {
+      return { authors: ['TKTKTK'], wasAssociatedPress: false };
+    }
+
+    // Helper function to check if original text contains Associated Press
+    function checkForAssociatedPress(originalText) {
+      if (!originalText || typeof originalText !== 'string') return false;
+      const lower = originalText.toLowerCase();
+      return lower.includes('the associated press') || lower.includes('associated press');
+    }
+
+    // 🎯 POSTMEDIA-SPECIFIC AUTHOR EXTRACTION
+    const isPM = POSTMEDIA.some(d => host.endsWith(d));
+    
+    if (isPM) {
+      // First try JSON-LD for Postmedia sites
+      const jsonLdMatch = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i);
+      if (jsonLdMatch) {
+        try {
+          const cleaned = jsonLdMatch[1].replace(/[\x00-\x1F\x7F]/g, "");
+          const json = JSON.parse(cleaned);
+          
+          if (json.author && Array.isArray(json.author)) {
+            const originalTexts = json.author.map(a => a.name || a);
+            const wasAP = originalTexts.some(checkForAssociatedPress);
+            const authors = originalTexts.map(cleanupAuthor).filter(Boolean);
+            if (authors.length) return { authors, wasAssociatedPress: wasAP };
+          } else if (json.author && typeof json.author === 'object' && json.author.name) {
+            const originalText = json.author.name;
+            return { 
+              authors: [cleanupAuthor(originalText)], 
+              wasAssociatedPress: checkForAssociatedPress(originalText) 
+            };
+          }
+        } catch (_) {}
+      }
+      
+      // Try parsely-author meta tag as fallback
+      const parselyAuthor = pick('parsely-author');
+      if (parselyAuthor) {
+        return { 
+          authors: [cleanupAuthor(parselyAuthor)], 
+          wasAssociatedPress: checkForAssociatedPress(parselyAuthor) 
+        };
+      }
+    }
+
+    // 🎯 EMPTY-FIRST APPROACH: Check official "no author" indicators
+    // 1. Check JSON-LD for explicit empty/null indicators
+    const jsonLdMatch = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i);
+    if (jsonLdMatch) {
+      try {
+        const cleaned = jsonLdMatch[1].replace(/[\x00-\x1F\x7F]/g, "");
+        const json = JSON.parse(cleaned);
+        
+        // If JSON-LD explicitly says no authors, respect that
+        if (json.authors && Array.isArray(json.authors) && json.authors.length === 0) {
+          return { authors: ['TKTKTK'], wasAssociatedPress: false };
+        }
+        if (json.byline === null || json.byline === "") {
+          return { authors: ['TKTKTK'], wasAssociatedPress: false };
+        }
+        
+        // Handle both single author and multiple authors
+        if (json.author) {
+          if (Array.isArray(json.author)) {
+            const originalTexts = json.author.map(a => a.name || a);
+            const wasAP = originalTexts.some(checkForAssociatedPress);
+            const authors = originalTexts.map(cleanupAuthor).filter(Boolean);
+            if (authors.length) return { authors, wasAssociatedPress: wasAP };
+          } else if (typeof json.author === 'object') {
+            if (json.author.name) {
+              const originalText = json.author.name;
+              return { 
+                authors: [cleanupAuthor(originalText)], 
+                wasAssociatedPress: checkForAssociatedPress(originalText) 
+              };
+            }
+          } else if (typeof json.author === 'string') {
+            const originalText = json.author;
+            return { 
+              authors: [cleanupAuthor(originalText)], 
+              wasAssociatedPress: checkForAssociatedPress(originalText) 
+            };
+          }
+        }
+      } catch (_) {}
+    }
+
+    // 2. Check meta tags for explicit empty indicators
+    const metaAuthors = pick('article:author', 'author', 'dc.creator', 'byl');
+    if (metaAuthors === "" || metaAuthors === null) {
+      return { authors: ['TKTKTK'], wasAssociatedPress: false };
+    }
+    if (metaAuthors) {
+      const wasAP = checkForAssociatedPress(metaAuthors);
+      // Split on commas or 'and' if multiple authors
+      const authors = metaAuthors.split(/,|\sand\s/).map(a => 
+        cleanupAuthor(a.replace(/^by\s+|^By\s+/, '').trim())
+      ).filter(Boolean);
+      return { authors, wasAssociatedPress: wasAP };
+    }
+
+    // 3. Try common byline patterns in HTML (last resort)
+    const bylinePatterns = [
+      /<div[^>]*class="[^"]*byline[^"]*"[^>]*>([^<]+)<\/div>/i,
+      /<div[^>]*class="[^"]*author[^"]*"[^>]*>([^<]+)<\/div>/i,
+      /<span[^>]*class="[^"]*byline[^"]*"[^>]*>([^<]+)<\/span>/i,
+      /<span[^>]*class="[^"]*author[^"]*"[^>]*>([^<]+)<\/span>/i,
+      /<a[^>]*rel="author"[^>]*>([^<]+)<\/a>/i,
+      /By\s+([^<\n]+?)(?:\s*[,<]|$)/i
+    ];
+
+    for (const pattern of bylinePatterns) {
+      const match = html.match(pattern);
+      if (match) {
+        const originalText = match[1];
+        const wasAP = checkForAssociatedPress(originalText);
+        const authors = originalText.split(/,|\sand\s/).map(a => 
+          cleanupAuthor(a.replace(/^by\s+|^By\s+/, '').trim())
+        ).filter(Boolean);
+        if (authors.length) return { authors, wasAssociatedPress: wasAP };
+      }
+    }
+
+    return { authors: ['TKTKTK'], wasAssociatedPress: false }; // Default to placeholder if nothing found
+  } catch (error) {
+    console.error('Error detecting authors:', error);
+    return { authors: ['TKTKTK'], wasAssociatedPress: false }; // Return placeholder on error
   }
 }
 
@@ -311,28 +487,66 @@ export async function scrapeInfo(url, cf = { cacheTtl: 300 }, depth = 0, visited
     clearTimeout(tid);
   }
 
-  // Special handling for Associated Press articles on The Canadian Press website
-  if (isCP) {
-    // Look for Associated Press byline in multiple places
-    const bylineMatch = html.match(/By\s+([^<]+)\s+The\s+Associated\s+Press/i) ||
-                       html.match(/<div[^>]*class="[^"]*byline[^"]*"[^>]*>([^<]+)<\/div>/i) ||
-                       html.match(/<div[^>]*class="[^"]*author[^"]*"[^>]*>([^<]+)<\/div>/i);
-    
-    // Also check the article content for AP attribution
-    const apMention = html.match(/By\s+([^<]+)\s+The\s+Associated\s+Press/i) ||
-                     html.match(/The\s+Associated\s+Press/i);
-    
-    if ((bylineMatch && bylineMatch[1].toLowerCase().includes('associated press')) || apMention) {
-      publication = "Associated Press";
-    }
-  }
-
   if (isCBC && /<title>\s*Access Denied/i.test(html)) {
     html = await (await fetch(url, { redirect: "follow", cf })).text();
   }
 
+  // Helper functions for meta tag extraction (moved up for use in Postmedia parser)
+  function pick(...names) {
+    for (const n of names) {
+      console.log("Checking meta tag:", n);
+      
+      // Original regex for properly formatted HTML
+      const re = new RegExp(`<meta[^>]+(?:property|name)=["']?${n}["']?[^>]*content=(["'])([\\s\\S]*?)\\1`, "i");
+      const match = re.exec(html);
+      if (match) {
+        console.log("Found match for", n, ":", match[2].trim());
+        return match[2].trim();
+      }
+      
+      // Additional regex for malformed HTML where content and name/property are smashed together
+      // BUT with better boundaries to avoid capturing too much
+      const malformedRe = new RegExp(`<meta[^>]*content=(["'])([^"'<>]{1,200}?)\\1\\s*(?:property|name)=["']?${n}["']?`, "i");
+      const malformedMatch = malformedRe.exec(html);
+      if (malformedMatch) {
+        console.log("Found malformed match for", n, ":", malformedMatch[2].trim());
+        return malformedMatch[2].trim();
+      }
+    }
+    return "";
+  }
+
+  function pickRev(n) {
+    console.log("Checking reversed meta tag:", n);
+    const re = new RegExp(`<meta[^>]*content=(["'])([\\s\\S]*?)\\1[^>]*(?:property|name)=["']?${n}["']?`, "i");
+    const match = re.exec(html);
+    if (match) {
+      console.log("Found reversed match for", n, ":", match[2].trim());
+    }
+    return match ? match[2].trim() : "";
+  }
+
   // 🧠 Postmedia-specific parser
   if (isPM) {
+    // Helper function for Postmedia author extraction
+    function extractPostmediaAuthors(json) {
+      // Try JSON-LD author array first
+      if (json && json.author && Array.isArray(json.author)) {
+        const authors = json.author.map(a => cleanupAuthor(a.name || a)).filter(Boolean);
+        if (authors.length) return authors;
+      } else if (json && json.author && typeof json.author === 'object' && json.author.name) {
+        return [cleanupAuthor(json.author.name)];
+      }
+      
+      // Try parsely-author meta tag as fallback
+      const parselyAuthor = pick('parsely-author');
+      if (parselyAuthor) {
+        return [cleanupAuthor(parselyAuthor)];
+      }
+      
+      return ['TKTKTK']; // Default fallback
+    }
+
     const jsonLdMatch = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i);
     if (jsonLdMatch) {
       try {
@@ -345,14 +559,16 @@ export async function scrapeInfo(url, cf = { cacheTtl: 300 }, depth = 0, visited
           : json.image?.url?.trim();
 
         if (head && img) {
-          // Get article type before returning
+          // Get article type and authors before returning
           const articleType = detectArticleType(url, html, pick);
+          const authors = extractPostmediaAuthors(json);
           return {
             headline: cleanupHeadline(head, host),
             image: getHighQualityImageUrl(img, host),
             url,
             publication,
-            articleType
+            articleType,
+            authors
           };
         }
       } catch (_) {}
@@ -363,14 +579,16 @@ export async function scrapeInfo(url, cf = { cacheTtl: 300 }, depth = 0, visited
     const ogImage = (html.match(/<meta[^>]+property=["']og:image["'][^>]*content=["']([^"']+)["']/i) || [])[1];
     
     if (ogTitle && ogImage) {
-      // Get article type before returning
+      // Get article type and authors before returning
       const articleType = detectArticleType(url, html, pick);
+      const authors = extractPostmediaAuthors(null);
       return { 
         headline: cleanupHeadline(ogTitle, host),
         image: getHighQualityImageUrl(ogImage, host),
         url,
         publication,
-        articleType
+        articleType,
+        authors
       };
     }
 
@@ -382,14 +600,16 @@ export async function scrapeInfo(url, cf = { cacheTtl: 300 }, depth = 0, visited
       const imgMatch = articleHtml.match(/<img[^>]+src=["']([^"']+)["']/i);
       
       if (titleMatch && imgMatch) {
-        // Get article type before returning
+        // Get article type and authors before returning
         const articleType = detectArticleType(url, html, pick);
+        const authors = extractPostmediaAuthors(null);
         return {
           headline: cleanupHeadline(titleMatch[1].replace(/<[^>]*>/g, '').trim(), host),
           image: getHighQualityImageUrl(imgMatch[1], host),
           url,
           publication,
-          articleType
+          articleType,
+          authors
         };
       }
     }
@@ -430,35 +650,28 @@ export async function scrapeInfo(url, cf = { cacheTtl: 300 }, depth = 0, visited
 
   // If still no headline, try other meta tags
   if (!head) {
+    console.log("Trying meta tags for headline...");
     const ogTitle = (html.match(/<meta[^>]+property=["']og:title["'][^>]*content=["']([^"']+)["']/i) || [])[1];
     const titleTag = (html.match(/<title>([^<]+)<\/title>/i) || [])[1];
+    console.log("Found og:title:", ogTitle);
+    console.log("Found title tag:", titleTag);
     head = ogTitle || titleTag;
-  }
-
-  function pick(...names) {
-    for (const n of names) {
-      const re = new RegExp(`<meta[^>]+(?:property|name)=["']?${n}["']?[^>]*content=(["'])([\\s\\S]*?)\\1`, "i");
-      const match = re.exec(html);
-      if (match) return match[2].trim();
-    }
-    return "";
-  }
-
-  function pickRev(n) {
-    const re = new RegExp(`<meta[^>]*content=(["'])([\\s\\S]*?)\\1[^>]*(?:property|name)=["']?${n}["']?`, "i");
-    const match = re.exec(html);
-    return match ? match[2].trim() : "";
   }
 
   // If still no headline, try other meta tags
   if (!head || head.length < 15) {
+    console.log("Trying additional meta tags...");
     head = pick("twitter:title") || pickRev("og:title");
   }
 
   // If still no headline, try h1
   if (!head || head.length < 15 || /&#8217;?$/i.test(head) || /don$/.test(head) || head === "(untitled)") {
+    console.log("Trying h1 tag...");
     const h1 = html.match(/<h1[^>]*>([\s\S]+?)<\/h1>/i);
-    if (h1) head = h1[1].replace(/<[^>]*>/g, "").trim();
+    if (h1) {
+      console.log("Found h1:", h1[1]);
+      head = h1[1].replace(/<[^>]*>/g, "").trim();
+    }
   }
 
   let img = "";
@@ -536,12 +749,38 @@ export async function scrapeInfo(url, cf = { cacheTtl: 300 }, depth = 0, visited
   // Get article type
   const articleType = detectArticleType(url, html, pick);
 
+  // Get authors
+  const authorsInfo = detectAuthors(url, html, pick);
+
+  // More targeted Canadian Press vs Associated Press detection
+  if (isCP && authorsInfo.wasAssociatedPress) {
+    publication = "Associated Press";
+  }
+
+  // For Canada Healthwatch, try h1 first since it's the most reliable
+  if (host === "canadahealthwatch.ca") {
+    const h1Match = html.match(/<h1[^>]*>([\s\S]+?)<\/h1>/i);
+    if (h1Match) {
+      const headline = h1Match[1].replace(/<[^>]*>/g, "").trim();
+      const articleType = detectArticleType(url, html, pick);
+      return {
+        headline: cleanupHeadline(headline, host),
+        image: '', // We'll implement image extraction later
+        url,
+        publication,
+        articleType
+      };
+    }
+  }
+
   // Return with publication and article type
   return { 
     headline: cleanupHeadline(head, host),
     image: img,
     url,
     publication,
-    articleType
+    articleType,
+    authors: authorsInfo.authors,
+    wasAssociatedPress: authorsInfo.wasAssociatedPress
   };
 } 

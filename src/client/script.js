@@ -4,6 +4,8 @@ export const clientScript = /*javascript*/ `
   const publicationBadge = $("publication");
   const publicationName = publicationBadge.querySelector('.publication-name');
   const articleType = publicationBadge.querySelector('.article-type');
+  const authorsBadge = $("authors");
+  const authorsList = authorsBadge.querySelector('.authors-list');
 
   // URL sanitization function
   function sanitizeUrl(input) {
@@ -56,6 +58,8 @@ export const clientScript = /*javascript*/ `
     outputGroup.classList.remove('visible');
     publicationBadge.style.display = 'none';
     publicationBadge.classList.remove('visible');
+    authorsBadge.style.display = 'none';
+    authorsBadge.classList.remove('visible');
     
     // Create and animate progress ring
     const button = $("go");
@@ -126,6 +130,15 @@ export const clientScript = /*javascript*/ `
       } else {
         publicationBadge.style.display = 'none';
       }
+
+      // Handle authors badge
+      if (data.authors && data.authors.length) {
+        authorsList.textContent = data.authors.join(', ');
+        authorsBadge.style.display = 'inline-flex';
+        setTimeout(() => authorsBadge.classList.add('visible'), 200);
+      } else {
+        authorsBadge.style.display = 'none';
+      }
       
       if (data.image) {
         $("preview").src = data.image;
@@ -171,7 +184,7 @@ export const clientScript = /*javascript*/ `
     const url = $("link").value;
     const img = $("preview");
     const publication = publicationName.textContent;
-    const type = articleType.textContent;
+    const authors = authorsList.textContent;
     
     if (!output) return;
     
@@ -205,10 +218,10 @@ export const clientScript = /*javascript*/ `
         await new Promise(resolve => setTimeout(resolve, COPY_DELAY));
       }
 
-      // 3. Copy Article Type if exists
-      if (type && publicationBadge.style.display !== 'none') {
-        await navigator.clipboard.writeText(type);
-        button.textContent = "Type Copied!";
+      // 3. Copy Authors if exist
+      if (authors && authorsBadge.style.display !== 'none') {
+        await navigator.clipboard.writeText(authors);
+        button.textContent = "Authors Copied!";
         gsap.to(button, {
           scale: 1.15,
           duration: 0.2,

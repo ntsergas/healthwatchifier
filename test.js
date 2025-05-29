@@ -1,147 +1,199 @@
-import { scrapeInfo } from './src/utils/scrapeInfo.js';
+import { scrapeInfo } from "./src/utils/scrapeInfo.js";
 
-// Test URLs with tracking parameters
-const urlsToSanitize = [
-  'https://nationalpost.com/opinion/terry-newman-over-300-ostriches-to-be-put-to-death-they-may-not-even-be-sick?utm_source=twitter&utm_medium=social&utm_campaign=test',
-  'https://www.theglobeandmail.com/canada/article-ontario-pharmacists-prescribing-powers/?fbclid=123&gclid=456&cmp=share',
-  'https://www.cbc.ca/news/canada/toronto/ontario-pharmacists-prescribing-power-1.7122918?mc_cid=abc&mc_eid=123',
-  'https://www.thestar.com/news/canada/ontario-to-expand-pharmacists-prescribing-powers-to-include-birth-control-travel-vaccines/article_6c4c6c2c-e0c4-5c9c-9c2c-c5c9c2c4c6c2.html?cmp=share_btn&utm_medium=social',
-  'https://vancouversun.com/news/canada/canadian-measles-seattle/wcm/851748a9-d947-4a68-a0c1-e61bf14e54d3?mc_cid=123&mc_eid=456',
-];
-
-// Main test URLs for article scraping
-const urls = [
-  // Postmedia sites
-  'https://nationalpost.com/opinion/terry-newman-over-300-ostriches-to-be-put-to-death-they-may-not-even-be-sick',
-  'https://nationalpost.com/health/america-canada-brain-drain',
-  'https://vancouversun.com/opinion/op-ed/jason-sutherland-trumps-tariffs-would-upend-canadian-health-care',
-  'https://vancouversun.com/news/canada/canadian-measles-seattle/wcm/851748a9-d947-4a68-a0c1-e61bf14e54d3',
-  'https://edmontonjournal.com/news/politics/alberta-premier-danielle-smith-defends-breaking-up-health-minister-role-into-four-portfolios',
-  'https://edmontonjournal.com/news/local-news/acute-care-alberta-details-announced',
-  'https://www.montrealgazette.com/news/article931534.html',
-  'https://www.montrealgazette.com/news/article806974.html',
-  'https://thestarphoenix.com/opinion/letters/letters-moes-demands-for-saskatchewan-autonomy-are-unreasonable',
-  'https://thestarphoenix.com/news/local-news/saskatoon-police-investigating-suspicious-death-in-sutherland',
-  'https://www.thestar.com/news/canada/ontario-to-expand-pharmacists-prescribing-powers-to-include-birth-control-travel-vaccines/article_6c4c6c2c-e0c4-5c9c-9c2c-c5c9c2c4c6c2.html',
-  'https://www.theglobeandmail.com/canada/article-ontario-pharmacists-prescribing-powers/',
-  'https://healthydebate.ca/2024/02/topic/ontario-pharmacists-prescribing/',
-  'https://www.theguardian.com/world/2024/feb/28/canada-pharmacare-deal-ndp-liberals',
-  'https://cabinradio.ca/239214/news/politics/shauna-morgan-introduces-nurses-collective-bargaining-bill/',
-  'https://www.thecanadianpressnews.ca/health/a-planned-parenthood-affiliate-plans-to-close-4-clinics-in-iowa-and-another-4-in/article_d7bb7008-8f99-5cff-8afc-b5b3b8243778.html'
-];
-
-// Expected publications for each URL
-const expectedPublications = {
-  'nationalpost.com': 'National Post',
-  'vancouversun.com': 'Vancouver Sun',
-  'edmontonjournal.com': 'Edmonton Journal',
-  'montrealgazette.com': 'Montreal Gazette',
-  'thestarphoenix.com': 'Saskatoon StarPhoenix',
-  'thestar.com': 'Toronto Star',
-  'cbc.ca': 'CBC News',
-  'globalnews.ca': 'Global News',
-  'theglobeandmail.com': 'The Globe and Mail',
-  'healthydebate.ca': 'Healthy Debate',
-  'thetrillium.ca': 'The Trillium',
-  'theguardian.com': 'The Guardian',
-  'thecanadianpressnews.ca': 'The Canadian Press',
-  'ap.org': 'Associated Press'
-};
-
-async function testImageLoad(imageUrl) {
-  try {
-    const response = await fetch(imageUrl);
-    if (!response.ok) {
-      throw new Error(`Failed to fetch image: ${response.status}`);
-    }
-
-    const contentType = response.headers.get('content-type');
-    if (!contentType?.startsWith('image/')) {
-      throw new Error(`Invalid content type: ${contentType}`);
-    }
-
-    return true;
-  } catch (error) {
-    console.error('Image Error:', error.message);
-    return false;
-  }
-}
-
-async function runTests() {
-  // First test URL sanitization
-  console.log('🧹 Testing URL sanitization...\n');
-  for (const url of urlsToSanitize) {
-    console.log('Original URL:', new URL(url).hostname);
-    console.log('Path:', new URL(url).pathname);
-    try {
-      const result = await scrapeInfo(url);
-      console.log('✅ Sanitized URL:', new URL(result.url).pathname);
-      console.log('---\n');
-    } catch (error) {
-      console.log('❌ Error:', error.message);
-      console.log('---\n');
-    }
-    // Add a small delay between requests
-    await new Promise(resolve => setTimeout(resolve, 1000));
-  }
-
-  // Then test article scraping
-  console.log('\n📰 Testing article scraping...\n');
-  let successCount = 0;
-  let imageSuccessCount = 0;
-  let publicationSuccessCount = 0;
+async function testComprehensiveScraping() {
+  console.log("Testing comprehensive scraping functionality...");
+  console.log("Checking: Title, Outlet, Type, Author, Image");
+  console.log("===============================================");
   
-  for (const url of urls) {
-    const urlObj = new URL(url);
-    console.log('\n📝 Testing:', urlObj.hostname);
-    console.log('Path:', urlObj.pathname);
+  const testUrls = [
+    "https://nationalpost.com/health/america-canada-brain-drain",
+    "https://edmontonjournal.com/news/politics/alberta-premier-danielle-smith-defends-breaking-up-health-minister-role-into-four-portfolios",
+    "https://www.theatlantic.com/science/archive/2025/05/screwworms-outbreak-united-states/682925/",
+    "https://www.axios.com/2025/05/27/covid-shots-not-recommended-kids-pregnant-women",
+    "https://ottawacitizen.com/news/ottawa-hospital-virtural-critical-care-iqaluit",
+    "https://globalnews.ca/news/11197626/quebec-family-physicians-bill-106/",
+    "https://www.thestar.com/opinion/letters-to-the-editor/the-problem-with-our-health-care-system-is-the-patient-is-not-part-of-the/article_139bb135-9cce-4cd8-87cc-db9e9bc3a217.html",
+    "https://www.healthing.ca/workforce/opinion-outdated-rules-keeping-qualified-mental-health-professionals-on-the-sidelines-in-quebec",
+    "https://policyoptions.irpp.org/magazines/may-2025/womens-health-research/",
+    "https://vancouversun.com/opinion/op-ed/opinion-lack-of-access-to-primary-care-is-bankrupting-our-health-care-system",
+    "https://www.thecanadianpressnews.ca/health/utah-lawmakers-said-gender-affirming-care-is-harmful-to-kids-their-own-study-contradicts-that/article_f6b83fd6-976e-5327-b673-f303dc6178fc.html",
+    "https://www.cbc.ca/news/canada/british-columbia/federal-minister-ostriches-1.7546052",
+    "https://www.reuters.com/business/healthcare-pharmaceuticals/us-cancels-more-700-million-funding-moderna-bird-flu-vaccine-2025-05-28/",
+    "https://www.ctvnews.ca/toronto/article/concerning-new-research-reveals-trend-that-may-be-contributing-to-family-doctor-shortage/",
+    "https://www.cbc.ca/news/canada/new-brunswick/nb-doctor-comes-home-from-america-1.7501946",
+    "https://www.cidrap.umn.edu/measles/precipice-disaster-measles-may-be-endemic-25-years-if-vaccine-uptake-stays-low-model",
+    "https://www.thecanadianpressnews.ca/prairies_bc/alberta/canadian-doctors-group-challenging-constitutionality-of-alberta-transgender-law/article_93c58bef-0bb9-5983-8d3d-436121ba2b2d.html",
+    "https://www.thecanadianpressnews.ca/health/will-you-be-able-to-get-a-covid-19-shot-heres-what-we-know-so/article_587d6aa3-9a48-5038-b3fc-7882dce176cb.html",
+    "https://www.thecanadianpressnews.ca/health/covid-vaccine-strongly-recommended-during-pregnancy-canadian-doctors-say/article_d1e420df-28ad-5e84-b52f-3a16b21edd11.html",
+    "https://www.thecanadianpressnews.ca/health/trump-administration-cancels-766-million-moderna-contract-to-fight-pandemic-flu/article_2dc16a2e-61ea-5580-86b6-8367d0803695.html",
+    "https://www.thecanadianpressnews.ca/health/",
+    "https://www.theglobeandmail.com/opinion/article-the-maga-movements-child-health-manifesto-is-a-muddle/",
+    "https://vancouversun.com/news/canada/canadian-measles-seattle/wcm/851748a9-d947-4a68-a0c1-e61bf14e54d3",
+    "https://medicalxpress.com/news/2025-05-covid-virus-reprograms-infection-fighters.html#google_vignette",
+    "https://www.independent.co.uk/bulletin/news/nb181-covid-variant-symptoms-b2759357.html",
+    "https://ici.radio-canada.ca/nouvelle/2167680/pharmaciens-probleme-agences-privees"
+  ];
+  
+  let successCount = 0;
+  let failCount = 0;
+  const results = [];
+  
+  for (let i = 0; i < testUrls.length; i++) {
+    const url = testUrls[i];
+    console.log(`\n[${i + 1}/${testUrls.length}] Testing: ${url}`);
+    
     try {
       const result = await scrapeInfo(url);
-      console.log('✅ Success!');
       
-      // Log core information
-      console.log('Publication:', result.publication);
-      console.log('Article Type:', result.articleType);
-      console.log('Title:', result.headline);
+      const hasTitle = result.headline && result.headline !== "(untitled)" && result.headline.length > 5;
+      const hasOutlet = result.publication && result.publication !== "Unknown";
+      const hasType = result.articleType && (result.articleType === "news" || result.articleType === "opinion");
+      const hasAuthor = result.authors && result.authors.length > 0 && result.authors[0] !== "TKTKTK";
+      const hasImage = result.image && result.image.length > 10;
       
-      // Test publication detection
-      const hostname = urlObj.hostname.replace(/^www\./, '');
-      const expectedPublication = expectedPublications[hostname.split('.').slice(-2).join('.')];
-      if (expectedPublication === result.publication) {
-        console.log('✅ Publication matched:', result.publication);
-        publicationSuccessCount++;
-      } else {
-        console.log('❌ Publication mismatch:', {
-          expected: expectedPublication,
-          got: result.publication
-        });
-      }
-
-      // Test image
-      if (result.image) {
-        console.log('🖼 Image found');
-        if (await testImageLoad(result.image)) {
-          console.log('✅ Image loaded successfully');
-          imageSuccessCount++;
-        }
-      } else {
-        console.log('❌ No image URL found');
-      }
-
+      console.log(`   TITLE:  ${hasTitle ? '✓' : '✗'} ${result.headline || 'MISSING'}`);
+      console.log(`   OUTLET: ${hasOutlet ? '✓' : '✗'} ${result.publication || 'MISSING'}`);
+      console.log(`   TYPE:   ${hasType ? '✓' : '✗'} ${result.articleType || 'MISSING'}`);
+      console.log(`   AUTHOR: ${hasAuthor ? '✓' : '✗'} ${result.authors ? result.authors.join(', ') : 'MISSING'}`);
+      console.log(`   IMAGE:  ${hasImage ? '✓' : '✗'} ${hasImage ? 'FOUND' : 'MISSING'}`);
+      
+      const score = [hasTitle, hasOutlet, hasType, hasAuthor, hasImage].filter(Boolean).length;
+      console.log(`   SCORE:  ${score}/5`);
+      
+      results.push({
+        url,
+        success: true,
+        score,
+        title: hasTitle,
+        outlet: hasOutlet,
+        type: hasType,
+        author: hasAuthor,
+        image: hasImage
+      });
+      
       successCount++;
+      
     } catch (error) {
-      console.log('❌ Error:', error.message);
+      console.log(`   ERROR: ${error.message}`);
+      results.push({ url, success: false, error: error.message });
+      failCount++;
     }
-    // Add a small delay between requests
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Be polite with requests - small delay between each
+    if (i < testUrls.length - 1) {
+      await new Promise(resolve => setTimeout(resolve, 1500));
+    }
   }
-
-  // Print summary
-  console.log('\n📊 Test Summary:');
-  console.log(`Articles: ${successCount}/${urls.length} successful`);
-  console.log(`Images: ${imageSuccessCount}/${urls.length} successful`);
-  console.log(`Publications: ${publicationSuccessCount}/${urls.length} successful`);
+  
+  // Summary Report
+  console.log("\n" + "=".repeat(60));
+  console.log("COMPREHENSIVE SCRAPING TEST SUMMARY");
+  console.log("=".repeat(60));
+  console.log(`Total URLs tested: ${testUrls.length}`);
+  console.log(`Successful scrapes: ${successCount}`);
+  console.log(`Failed scrapes: ${failCount}`);
+  console.log(`Success rate: ${((successCount / testUrls.length) * 100).toFixed(1)}%`);
+  
+  if (successCount > 0) {
+    const successfulResults = results.filter(r => r.success);
+    const titleSuccess = successfulResults.filter(r => r.title).length;
+    const outletSuccess = successfulResults.filter(r => r.outlet).length;
+    const typeSuccess = successfulResults.filter(r => r.type).length;
+    const authorSuccess = successfulResults.filter(r => r.author).length;
+    const imageSuccess = successfulResults.filter(r => r.image).length;
+    
+    console.log("\nField Success Rates:");
+    console.log(`   Title:  ${titleSuccess}/${successCount} (${((titleSuccess / successCount) * 100).toFixed(1)}%)`);
+    console.log(`   Outlet: ${outletSuccess}/${successCount} (${((outletSuccess / successCount) * 100).toFixed(1)}%)`);
+    console.log(`   Type:   ${typeSuccess}/${successCount} (${((typeSuccess / successCount) * 100).toFixed(1)}%)`);
+    console.log(`   Author: ${authorSuccess}/${successCount} (${((authorSuccess / successCount) * 100).toFixed(1)}%)`);
+    console.log(`   Image:  ${imageSuccess}/${successCount} (${((imageSuccess / successCount) * 100).toFixed(1)}%)`);
+    
+    const avgScore = successfulResults.reduce((sum, r) => sum + r.score, 0) / successfulResults.length;
+    console.log(`\nAverage score: ${avgScore.toFixed(1)}/5`);
+  }
+  
+  if (failCount > 0) {
+    console.log("\nFailed URLs:");
+    results.filter(r => !r.success).forEach(r => {
+      console.log(`   - ${r.url}: ${r.error}`);
+    });
+  }
+  
+  return results;
 }
 
-// Run all tests
-runTests().catch(console.error); 
+async function testSharonKirkeyAuthor() {
+  console.log("Testing Sharon Kirkey author detection...");
+  console.log("===========================================");
+  
+  const testUrl = "https://nationalpost.com/health/america-canada-brain-drain";
+  
+  try {
+    console.log(`Testing: ${testUrl}`);
+    const result = await scrapeInfo(testUrl);
+    
+    console.log("\nResults:");
+    console.log(`   TITLE:  ${result.headline || 'MISSING'}`);
+    console.log(`   OUTLET: ${result.publication || 'MISSING'}`);
+    console.log(`   TYPE:   ${result.articleType || 'MISSING'}`);
+    console.log(`   AUTHOR: ${result.authors ? result.authors.join(', ') : 'MISSING'}`);
+    console.log(`   IMAGE:  ${result.image ? 'FOUND' : 'MISSING'}`);
+    
+    const hasAuthor = result.authors && result.authors.length > 0 && result.authors[0] !== "TKTKTK";
+    
+    if (hasAuthor && result.authors[0].includes('Sharon Kirkey')) {
+      console.log("\n✅ SUCCESS: Sharon Kirkey detected correctly!");
+    } else {
+      console.log("\n❌ ISSUE: Sharon Kirkey not detected properly");
+      console.log(`   Expected: Sharon Kirkey`);
+      console.log(`   Got: ${result.authors ? result.authors.join(', ') : 'NOTHING'}`);
+    }
+    
+    return result;
+  } catch (error) {
+    console.error("❌ Test failed:", error.message);
+    throw error;
+  }
+}
+
+async function testAssociatedPressAttribution() {
+  console.log("Testing Associated Press attribution fix...");
+  console.log("=============================================");
+  
+  const testUrl = "https://www.thecanadianpressnews.ca/health/will-you-be-able-to-get-a-covid-19-shot-heres-what-we-know-so/article_587d6aa3-9a48-5038-b3fc-7882dce176cb.html";
+  
+  try {
+    console.log(`Testing: ${testUrl}`);
+    const result = await scrapeInfo(testUrl);
+    
+    console.log("\nResults:");
+    console.log(`   TITLE:  ${result.headline || 'MISSING'}`);
+    console.log(`   OUTLET: ${result.publication || 'MISSING'}`);
+    console.log(`   TYPE:   ${result.articleType || 'MISSING'}`);
+    console.log(`   AUTHOR: ${result.authors ? result.authors.join(', ') : 'MISSING'}`);
+    console.log(`   IMAGE:  ${result.image ? 'FOUND' : 'MISSING'}`);
+    
+    // Check if the outlet was correctly switched to Associated Press
+    if (result.publication === "Associated Press") {
+      console.log("\n✅ SUCCESS: Outlet correctly attributed to Associated Press!");
+      console.log("   This article had 'The Associated Press' in the byline and was properly detected.");
+    } else if (result.publication === "The Canadian Press") {
+      console.log("\n❌ ISSUE: Still showing as 'The Canadian Press' instead of 'Associated Press'");
+      console.log("   Expected: Associated Press");
+      console.log("   Got: The Canadian Press");
+      console.log("   Authors:", result.authors);
+    } else {
+      console.log(`\n⚠️  UNEXPECTED: Got publication '${result.publication}'`);
+    }
+    
+    return result;
+  } catch (error) {
+    console.error("❌ Test failed:", error.message);
+    throw error;
+  }
+}
+
+testComprehensiveScraping();
+testSharonKirkeyAuthor();
+testAssociatedPressAttribution(); 

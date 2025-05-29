@@ -13,7 +13,12 @@ export const htmlTemplate = ({ styles, script }) => /*html*/ `
   <script src="https://unpkg.com/lucide@latest"></script>
   <style>
     ${styles}
-    .publication-badge {
+    .badge-container {
+      display: flex;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+    }
+    .publication-badge, .authors-badge {
       display: inline-flex;
       align-items: center;
       gap: 0.75rem;
@@ -23,16 +28,15 @@ export const htmlTemplate = ({ styles, script }) => /*html*/ `
       padding: 0.5rem 1rem;
       font-size: 0.875rem;
       color: #8b5cf6;
-      margin-bottom: 1rem;
       opacity: 0;
       transform: translateY(-10px);
       transition: all 0.3s ease;
     }
-    .publication-badge.visible {
+    .publication-badge.visible, .authors-badge.visible {
       opacity: 1;
       transform: translateY(0);
     }
-    .publication-badge svg {
+    .publication-badge svg, .authors-badge svg {
       width: 16px;
       height: 16px;
       fill: currentColor;
@@ -46,6 +50,10 @@ export const htmlTemplate = ({ styles, script }) => /*html*/ `
     .article-type {
       color: #6d6d7d;
       text-transform: capitalize;
+      font-size: 0.875rem;
+    }
+    .authors-list {
+      color: #6d6d7d;
       font-size: 0.875rem;
     }
   </style>
@@ -62,18 +70,26 @@ export const htmlTemplate = ({ styles, script }) => /*html*/ `
         <button id="copyAll">Copy All</button>
       </div>
       <div class="output-group">
-        <div id="publication" class="publication-badge" style="display: none;">
-          <svg viewBox="0 0 24 24">
-            <path d="M12 2L1 21h22L12 2zm0 3.45l6.52 11.33H5.48L12 5.45z"/>
-          </svg>
-          <span class="publication-name"></span>
-          <div class="badge-divider"></div>
-          <span class="article-type"></span>
+        <div class="badge-container">
+          <div id="publication" class="publication-badge" style="display: none;">
+            <svg viewBox="0 0 24 24">
+              <path d="M12 2L1 21h22L12 2zm0 3.45l6.52 11.33H5.48L12 5.45z"/>
+            </svg>
+            <span class="publication-name"></span>
+            <div class="badge-divider"></div>
+            <span class="article-type"></span>
+          </div>
+          <div id="authors" class="authors-badge" style="display: none;">
+            <svg viewBox="0 0 24 24">
+              <path d="M12 11a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm6 10a7 7 0 0 0-14 0"/>
+            </svg>
+            <span class="authors-list"></span>
+          </div>
         </div>
         <div class="label">Title</div>
-        <input type="text" id="title" readonly />
+        <input type="text" id="title" />
         <div class="label">Output</div>
-        <textarea id="out" readonly></textarea>
+        <textarea id="out"></textarea>
         <img id="preview" alt="Article preview" />
       </div>
     </div>

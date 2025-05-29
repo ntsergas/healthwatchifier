@@ -20,6 +20,7 @@ export const PUBLICATION_NAMES = {
   "canada.com": "Canada.com",
 
   // Other Canadian Publications
+  "canadahealthwatch.ca": "Canada Healthwatch",
   "cbc.ca": "CBC News",
   "globalnews.ca": "Global News",
   "theglobeandmail.com": "The Globe and Mail",
@@ -30,6 +31,9 @@ export const PUBLICATION_NAMES = {
   "cabinradio.ca": "Cabin Radio",
   "thecanadianpressnews.ca": "The Canadian Press",
   "ap.org": "Associated Press",
+  "policyoptions.irpp.org": "Policy Options",
+  "healthing.ca": "Healthing",
+  "ici.radio-canada.ca": "Radio-Canada",
 
   // International Publications
   "theguardian.com": "The Guardian",
@@ -37,5 +41,14 @@ export const PUBLICATION_NAMES = {
   "washingtonpost.com": "The Washington Post",
   "reuters.com": "Reuters",
   "bbc.com": "BBC News",
-  "bbc.co.uk": "BBC News"
+  "bbc.co.uk": "BBC News",
+  "theatlantic.com": "The Atlantic",
+  "newsweek.com": "Newsweek",
+  "axios.com": "Axios",
+  "independent.co.uk": "UK Independent",
+  
+  // Medical/Health Publications
+  "justanoldcountrydoctor.com": "justanoldcountrydoctor",
+  "medicalxpress.com": "MedicalXpress.com",
+  "cidrap.umn.edu": "CIDRAP"
 }; 
