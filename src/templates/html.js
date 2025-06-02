@@ -66,8 +66,14 @@ export const htmlTemplate = ({ styles, script }) => /*html*/ `
         <input type="url" id="link" placeholder="Paste a news article URL here..." />
       </div>
       <div class="button-group">
-        <button id="go">Healthwatch-ify</button>
-        <button id="copyAll">Copy All</button>
+        <button id="go" title="Press Enter to activate">
+          Healthwatch-ify
+          <span class="kbd-hint">↵</span>
+        </button>
+        <button id="copyAll" title="Press Ctrl+Q to activate">
+          Copy All
+          <span class="kbd-hint">⌃Q</span>
+        </button>
       </div>
       <div class="output-group">
         <div class="badge-container">

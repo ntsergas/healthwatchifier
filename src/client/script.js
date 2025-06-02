@@ -335,4 +335,30 @@ export const clientScript = /*javascript*/ `
       button.textContent = "Copy All";
     }
   };
+
+  // 🎹 KEYBOARD SHORTCUTS
+  document.addEventListener('keydown', (e) => {
+    // Enter key: Trigger Healthwatchify (but not when typing in input)
+    if (e.key === 'Enter' && e.target.id !== 'link') {
+      e.preventDefault();
+      $("go").click();
+    }
+    
+    // Ctrl+Q: Trigger Copy All
+    if (e.ctrlKey && e.key === 'q') {
+      e.preventDefault();
+      const copyButton = $("copyAll");
+      if (copyButton && copyButton.style.display !== 'none') {
+        copyButton.click();
+      }
+    }
+  });
+  
+  // Allow Enter in URL input to trigger healthwatchify
+  $("link").addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      $("go").click();
+    }
+  });
 `; 

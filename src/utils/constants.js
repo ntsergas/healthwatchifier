@@ -1,4 +1,4 @@
-export const TAGLINE = "𝗠𝗼𝗿𝗲 𝗵𝗲𝗮𝗹𝘁𝗵 𝗻𝗲𝘄𝘀 ⇢ CanadaHealthwatch.ca 🍁";
+export const TAGLINE = "𝗠𝗼𝗿𝗲 𝗵𝗲𝗮𝗹𝘁𝗵 𝗻𝗲𝘄𝘀 ⇢ CanadaHealthwatch.ca";
 
 export const PUBLICATION_NAMES = {
   // Postmedia Publications
@@ -34,6 +34,9 @@ export const PUBLICATION_NAMES = {
   "policyoptions.irpp.org": "Policy Options",
   "healthing.ca": "Healthing",
   "ici.radio-canada.ca": "Radio-Canada",
+  "thetyee.ca": "The Tyee",
+  "nunatsiaq.com": "Nunatsiaq",
+  "canadianaffairs.news": "Canadian Affairs",
 
   // International Publications
   "theguardian.com": "The Guardian",
@@ -46,9 +49,15 @@ export const PUBLICATION_NAMES = {
   "newsweek.com": "Newsweek",
   "axios.com": "Axios",
   "independent.co.uk": "UK Independent",
+  "npr.org": "NPR",
+  "motherjones.com": "Mother Jones",
+  "nbcnews.com": "NBC News",
+  "arstechnica.com": "Ars Technica",
   
   // Medical/Health Publications
   "justanoldcountrydoctor.com": "justanoldcountrydoctor",
   "medicalxpress.com": "MedicalXpress.com",
-  "cidrap.umn.edu": "CIDRAP"
+  "cidrap.umn.edu": "CIDRAP",
+  "kffhealthnews.org": "KFF Health News",
+  "statnews.com": "STAT"
 }; 

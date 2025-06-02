@@ -27,11 +27,14 @@ async function testComprehensiveScraping() {
     "https://www.thecanadianpressnews.ca/health/covid-vaccine-strongly-recommended-during-pregnancy-canadian-doctors-say/article_d1e420df-28ad-5e84-b52f-3a16b21edd11.html",
     "https://www.thecanadianpressnews.ca/health/trump-administration-cancels-766-million-moderna-contract-to-fight-pandemic-flu/article_2dc16a2e-61ea-5580-86b6-8367d0803695.html",
     "https://www.thecanadianpressnews.ca/health/",
+    "https://kffhealthnews.org/news/article/trump-team-cited-safety-limiting-covid-shots-patients-health-advocates-see-more-risk/",
     "https://www.theglobeandmail.com/opinion/article-the-maga-movements-child-health-manifesto-is-a-muddle/",
     "https://vancouversun.com/news/canada/canadian-measles-seattle/wcm/851748a9-d947-4a68-a0c1-e61bf14e54d3",
     "https://medicalxpress.com/news/2025-05-covid-virus-reprograms-infection-fighters.html#google_vignette",
     "https://www.independent.co.uk/bulletin/news/nb181-covid-variant-symptoms-b2759357.html",
-    "https://ici.radio-canada.ca/nouvelle/2167680/pharmaciens-probleme-agences-privees"
+    "https://ici.radio-canada.ca/nouvelle/2167680/pharmaciens-probleme-agences-privees",
+    "https://thetyee.ca/News/2025/05/29/BC-Measles-Vaccination-Schools/",
+    "https://healthydebate.ca/2025/05/topic/this-will-make-you-a-better-doctor/"
   ];
   
   let successCount = 0;
@@ -194,6 +197,71 @@ async function testAssociatedPressAttribution() {
   }
 }
 
+// 🎯 TEST NEW BROWSER HEADERS UTILITY
+function testBrowserHeaders() {
+  console.log('\n🎯 Testing Browser Headers Utility...');
+  
+  try {
+    const { generateBrowserHeaders, getSiteOptimizedHeaders, validateHeaders } = require('./src/utils/browserHeaders.js');
+    
+    // Test basic Opera header generation
+    const operaHeaders = generateBrowserHeaders({ 
+      url: 'https://www.nytimes.com/article',
+      profile: 'opera_110_windows' 
+    });
+    
+    console.log('✅ Generated Opera headers:');
+    console.log('User-Agent:', operaHeaders['User-Agent']);
+    console.log('Sec-CH-UA:', operaHeaders['Sec-CH-UA']);
+    console.log('Referer:', operaHeaders['Referer']);
+    
+    // Test site-optimized headers for Postmedia
+    const postmediaHeaders = getSiteOptimizedHeaders('https://nationalpost.com/news/article');
+    console.log('\n✅ Postmedia-optimized headers:');
+    console.log('Sec-Fetch-Site:', postmediaHeaders['Sec-Fetch-Site']);
+    console.log('Referer:', postmediaHeaders['Referer']);
+    
+    // Validate headers
+    const validation = validateHeaders(operaHeaders);
+    console.log('\n✅ Header validation:');
+    console.log('Valid:', validation.valid);
+    console.log('Score:', validation.score);
+    if (validation.warnings.length > 0) {
+      console.log('Warnings:', validation.warnings);
+    }
+    
+    // Test that we have all required headers
+    const requiredHeaders = ['User-Agent', 'Accept', 'Accept-Language', 'Accept-Encoding', 'Sec-Fetch-Site'];
+    const missing = requiredHeaders.filter(h => !operaHeaders[h]);
+    
+    if (missing.length === 0) {
+      console.log('✅ All required headers present');
+    } else {
+      console.log('❌ Missing headers:', missing);
+    }
+    
+    // Test that Opera UA includes OPR/
+    if (operaHeaders['User-Agent'].includes('OPR/110')) {
+      console.log('✅ Opera User-Agent correctly formatted');
+    } else {
+      console.log('❌ Opera User-Agent missing OPR/ identifier');
+    }
+    
+    // Test that Client Hints match Opera
+    if (operaHeaders['Sec-CH-UA']?.includes('Opera')) {
+      console.log('✅ Client Hints correctly identify Opera');
+    } else {
+      console.log('❌ Client Hints missing Opera brand');
+    }
+    
+    console.log('✅ Browser Headers utility test completed');
+    
+  } catch (error) {
+    console.error('❌ Browser Headers test failed:', error.message);
+  }
+}
+
 testComprehensiveScraping();
 testSharonKirkeyAuthor();
-testAssociatedPressAttribution(); 
+testAssociatedPressAttribution();
+testBrowserHeaders(); 

@@ -1,6 +1,10 @@
 // import puppeteer from '@cloudflare/puppeteer';
 
 import { PUBLICATION_NAMES } from './constants.js';
+import { detectOpinionFromUrl, detectOpinionFromTitle } from './articleTypeDetection.js';
+import { detectAuthorFromHtml } from './authorDetection.js';
+import { logger } from './logger.js';
+import { getSiteOptimizedHeaders } from './browserHeaders.js';
 
 const decode = (s = "") =>
   s
@@ -19,6 +23,7 @@ const POSTMEDIA = [
   "leaderpost.com", "thestarphoenix.com", "windsorstar.com",
   "theprovince.com", "torontosun.com", "winnipegsun.com",
   "calgarysun.com", "edmontonsun.com", "ottawasun.com", "canada.com",
+  "healthing.ca",
 ];
 
 // Helper functions
@@ -77,33 +82,33 @@ async function fetchWithRetry(url, options, retries = 3, baseDelay = 1000) {
 // Helper function to clean up headlines
 function cleanupHeadline(headline, host) {
   if (!headline) return "(untitled)";
-  
-  console.log("Original headline:", headline);
-  
+  const headlineLogger = logger.child('HEADLINE');
+
+  headlineLogger.debug("Original headline:", headline);
   headline = headline.replace(/\s+/g, " ").trim();
-  console.log("After whitespace cleanup:", headline);
-  
+  headlineLogger.debug("After whitespace cleanup:", headline);
+
   // Remove site-specific suffixes
   headline = headline.replace(/\s*\|\s*(CBC News|CBC Radio|CBC|Globalnews\.ca|CTV News|Toronto Star|The Globe and Mail|National Post|National|Vancouver Sun|Edmonton Journal|Montreal Gazette|The Trillium|Canada Healthwatch)\s*$/i, "");
-  console.log("After suffix removal:", headline);
-  
+  headlineLogger.debug("After suffix removal:", headline);
+
   headline = headline.replace(/\s+-\s+(National|Healthy Debate|The Globe and Mail|Canada Healthwatch)\s*$/i, "");
-  console.log("After dash suffix removal:", headline);
-  
+  headlineLogger.debug("After dash suffix removal:", headline);
+
   // Remove common prefixes
   headline = headline.replace(/^(WATCH|LISTEN|READ|EXCLUSIVE|UPDATE|OPINION):\s+/i, "");
-  console.log("After prefix removal:", headline);
-  
+  headlineLogger.debug("After prefix removal:", headline);
+
   // Fix common encoding issues
   headline = headline
     .replace(/[\u2018\u2019]/g, "'")
     .replace(/[\u201C\u201D]/g, '"')
     .replace(/\s*\|\s*$/g, "")
     .replace(/\s*\.{3,}\s*$/g, "");
-  console.log("After encoding fixes:", headline);
+  headlineLogger.debug("After encoding fixes:", headline);
 
   const final = decode(headline);
-  console.log("Final headline:", final);
+  headlineLogger.debug("Final headline:", final);
   return final;
 }
 
@@ -113,6 +118,35 @@ function getHighQualityImageUrl(imgUrl, host) {
   
   try {
     const url = new URL(imgUrl);
+    
+    // 🎯 TORONTO STAR AND OTHER BLOX SITES (bloximages.chicago2.vip.townnews.com)
+    if (url.hostname.includes('bloximages.chicago2.vip.townnews.com')) {
+      // Remove small resize parameters and replace with larger ones
+      let processed = imgUrl
+        // First, handle HTML entities
+        .replace(/&amp;/g, '&');
+      
+      // Check if URL has query parameters
+      const hasQuery = processed.includes('?');
+      
+      // Remove existing parameters we want to replace/remove
+      processed = processed
+        // Remove crop parameters entirely to get uncropped image
+        .replace(/[&?]crop=[^&]*/g, '')
+        // Remove existing resize parameters
+        .replace(/[&?]resize=[^&]*/g, '')
+        // Remove existing order parameters
+        .replace(/[&?]order=[^&]*/g, '')
+        // Clean up any double ampersands or trailing &
+        .replace(/&&+/g, '&')
+        .replace(/[&?]$/, '');
+      
+      // Add our high-quality parameters
+      const separator = processed.includes('?') ? '&' : '?';
+      processed += `${separator}resize=1200,800&order=resize`;
+      
+      return processed;
+    }
     
     // Postmedia sites
     if (url.hostname.includes('smartcdn.gprod.postmedia.digital')) {
@@ -148,6 +182,20 @@ function getHighQualityImageUrl(imgUrl, host) {
                   .replace(/quality=\d+/, 'quality=85');
     }
     
+    // 🎯 GUARDIAN: Clean and optimize image URLs
+    if (url.hostname.includes('i.guim.co.uk')) {
+      // 🚨 SIGNATURE PRESERVATION: Guardian uses signed URLs
+      // Remove overlay parameters that cause image display issues
+      // Handle both encoded and unencoded versions
+      return imgUrl
+        .replace(/[&?]overlay-align=[^&]*/g, '')
+        .replace(/[&?]overlay-width=[^&]*/g, '')
+        .replace(/[&?]overlay-base64=[^&]*/g, '')
+        // Clean up parameter formatting
+        .replace(/&+/g, '&')
+        .replace(/[&?]$/, '');
+    }
+    
     // Generic WordPress sites (like Healthy Debate)
     if (imgUrl.includes('wp-content/uploads/')) {
       // Most WordPress installations keep high-res originals
@@ -158,6 +206,165 @@ function getHighQualityImageUrl(imgUrl, host) {
   } catch {
     return imgUrl;
   }
+}
+
+// 🎯 CONTENT-FIRST IMAGE EXTRACTION: Simple and elegant approach
+function extractContentImage(html, url) {
+  try {
+    const urlObj = new URL(url);
+    const host = urlObj.hostname.replace(/^www\./, '');
+    
+    // 🌐 DOMAIN-SPECIFIC OVERRIDES: Some sites work better with social previews
+    if (host === 'globalnews.ca') {
+      // Global News: Social previews are actually high-quality and relevant
+      return null; // Let it fall back to social preview extraction
+    }
+    
+    if (host === 'cbc.ca') {
+      // CBC: Social previews use the main story image, avoiding complex HTML parsing
+      return null; // Let it fall back to social preview extraction
+    }
+    
+    if (host === 'thetyee.ca') {
+      // The Tyee: Social previews use the main story image, avoiding author byline images
+      return null; // Let it fall back to social preview extraction
+    }
+    
+    if (host === 'healthydebate.ca') {
+      // Healthy Debate: Social previews are more reliable than content parsing
+      return null; // Let it fall back to social preview extraction
+    }
+    
+    if (host === 'theguardian.com') {
+      // Guardian: Look for main article image in HTML to avoid overlay-laden social previews
+      const guardianImgMatch = html.match(/<img[^>]+data-component="image"[^>]+src="([^"]+)"/i) ||
+                              html.match(/<picture[^>]*>[\s\S]*?<img[^>]+src="([^"]+)"[^>]*>[\s\S]*?<\/picture>/i) ||
+                              html.match(/<figure[^>]*>[\s\S]*?<img[^>]+src="([^"]+)"[^>]*>[\s\S]*?<\/figure>/i);
+      
+      if (guardianImgMatch) {
+        let guardianImg = guardianImgMatch[1];
+        // Convert relative URLs to absolute
+        if (guardianImg.startsWith('/')) {
+          guardianImg = new URL(guardianImg, url).href;
+        }
+        return guardianImg;
+      }
+      
+      // Fallback to social preview only if no content image found
+      return null; 
+    }
+    
+    // Find the h1 tag first
+    const h1Match = html.match(/<h1[^>]*>[\s\S]*?<\/h1>/i);
+    if (!h1Match) return null;
+    
+    // Get content after h1 (first 5KB for performance)
+    const h1Index = html.indexOf(h1Match[0]) + h1Match[0].length;
+    const contentAfterH1 = html.substring(h1Index, h1Index + 5000);
+    
+    // Find the first valid image in the content
+    return findFirstValidImage(contentAfterH1, url);
+    
+  } catch (e) {
+    console.warn('Error extracting content image:', e.message);
+    return null;
+  }
+}
+
+// Helper function to find the first valid image in given content
+function findFirstValidImage(content, url) {
+  const imgRegex = /<img[^>]+(?:src|data-src|data-original)=["']([^"']+)["'][^>]*>/gi;
+  let imgMatch;
+  
+  while ((imgMatch = imgRegex.exec(content)) !== null) {
+    let imgUrl = imgMatch[1];
+    const fullImgTag = imgMatch[0];
+    
+    // 🎯 HTML ENTITY DECODING: Fix &#038; and other entities in URLs
+    imgUrl = decode(imgUrl);
+    
+    // Skip base64 images (placeholders, lazy loading)
+    if (imgUrl.startsWith('data:')) {
+      continue;
+    }
+    
+    // Convert relative URLs to absolute
+    if (imgUrl.startsWith('/')) {
+      imgUrl = new URL(imgUrl, url).href;
+    }
+    
+    // 🚨 ROBUST VALIDATION: Reject broken/truncated URLs
+    try {
+      const urlObj = new URL(imgUrl);
+      
+      // Reject broken CloudFront URLs (too short, missing file extension)
+      if (urlObj.hostname.includes('cloudfront.net')) {
+        const pathname = urlObj.pathname;
+        if (pathname.length < 20 || (!pathname.includes('.') && pathname.split('/').pop().length < 20)) {
+          console.log('Skipping broken CloudFront URL:', imgUrl);
+          continue;
+        }
+      }
+      
+      // Reject URLs that are too short to be valid image URLs
+      if (imgUrl.length < 50) {
+        console.log('Skipping too-short URL:', imgUrl);
+        continue;
+      }
+    } catch (e) {
+      continue; // Invalid URL, skip it
+    }
+    
+    // 🎯 ENHANCED BYLINE FILTERING: Skip author photos, small icons, and non-content images
+    if (imgUrl.includes('logo') || 
+        imgUrl.includes('icon') || 
+        imgUrl.includes('avatar') ||
+        imgUrl.includes('badge') ||
+        imgUrl.includes('button') ||
+        imgUrl.includes('placeholder') ||
+        imgUrl.includes('spacer') ||
+        imgUrl.includes('transparent') ||
+        imgUrl.includes('blank') ||
+        imgUrl.includes('byline') ||
+        imgUrl.includes('author') ||
+        fullImgTag.includes('byline') ||
+        fullImgTag.includes('c-byline') ||
+        fullImgTag.includes('data-cy="author-image-img"') ||
+        fullImgTag.includes('class="author-image"') ||
+        fullImgTag.includes('class="authorprofile-image"') ||
+        fullImgTag.includes('authorprofile-image') ||
+        fullImgTag.includes('author-image')) {
+      console.log('Skipping author/byline/non-content image:', imgUrl);
+      continue;
+    }
+    
+    // Skip images with small dimensions
+    const dimensionMatch = imgUrl.match(/(\d+)x(\d+)/);
+    if (dimensionMatch) {
+      const width = parseInt(dimensionMatch[1]);
+      const height = parseInt(dimensionMatch[2]);
+      if (width < 200 || height < 150) {
+        continue;
+      }
+    }
+    
+    // Check HTML attributes for small dimensions
+    const widthMatch = fullImgTag.match(/width=["']?(\d+)["']?/i);
+    const heightMatch = fullImgTag.match(/height=["']?(\d+)["']?/i);
+    if (widthMatch && heightMatch) {
+      const width = parseInt(widthMatch[1]);
+      const height = parseInt(heightMatch[1]);
+      if (width < 200 || height < 150) {
+        console.log(`Skipping small image (${width}x${height}):`, imgUrl);
+        continue;
+      }
+    }
+    
+    // 🎯 FIRST VALID IMAGE: Return immediately when we find a good image
+    return imgUrl;
+  }
+  
+  return null;
 }
 
 // Helper function to get publication name from URL
@@ -193,7 +400,7 @@ function getPublicationName(url) {
 }
 
 // Helper function to detect article type (news vs opinion)
-function detectArticleType(url, html, pick) {
+function detectArticleType(url, html, pick, headline = '') {
   try {
     const urlObj = new URL(url);
     const host = urlObj.hostname.replace(/^www\./, '');
@@ -203,17 +410,36 @@ function detectArticleType(url, html, pick) {
       return 'opinion';
     }
 
-    // 1. Check URL patterns
-    const urlLower = url.toLowerCase();
-    if (urlLower.includes('/opinion/') || 
-        urlLower.includes('/analysis/') || 
-        urlLower.includes('/perspectives/') ||
-        urlLower.includes('/perspective/') ||
-        urlLower.includes('/op-ed/')) {
+    // 🎯 HEALTHY DEBATE SPECIFIC: Check for categories in HTML
+    if (host === 'healthydebate.ca') {
+      // Look for category headers in the HTML content
+      if (html.match(/<[^>]*>Article<\/[^>]*>/i) || 
+          html.match(/>\s*Article\s*</i)) {
+        return 'news';
+      }
+      if (html.match(/<[^>]*>Opinion<\/[^>]*>/i) || 
+          html.match(/>\s*Opinion\s*</i) ||
+          html.match(/<[^>]*>First Person<\/[^>]*>/i) || 
+          html.match(/>\s*First Person\s*</i)) {
+        return 'opinion';
+      }
+      // Default to opinion for /topic/ URLs if no category found (as per user info)
+      if (url.includes('/topic/')) {
+        return 'opinion';
+      }
+    }
+
+    // 1. Check URL patterns using our improved helper
+    if (detectOpinionFromUrl(url)) {
       return 'opinion';
     }
 
-    // 2. Check meta tags
+    // 2. Check headline/title patterns using our helper
+    if (detectOpinionFromTitle(headline)) {
+      return 'opinion';
+    }
+
+    // 3. Check meta tags
     const articleType = pick('article:type', 'og:type', 'article:section', 'article:genre');
     if (articleType) {
       const typeLower = articleType.toLowerCase();
@@ -226,7 +452,7 @@ function detectArticleType(url, html, pick) {
       }
     }
 
-    // 3. Check JSON-LD data
+    // 4. Check JSON-LD data
     const jsonLdMatch = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i);
     if (jsonLdMatch) {
       try {
@@ -244,7 +470,7 @@ function detectArticleType(url, html, pick) {
       } catch (_) {}
     }
 
-    // 4. Check common article markers in HTML
+    // 5. Check common article markers in HTML
     const markers = html.match(/<div[^>]*class="[^"]*(?:article-type|content-type|article-label)[^"]*"[^>]*>([^<]+)<\/div>/i) ||
                    html.match(/<span[^>]*class="[^"]*(?:article-type|content-type|article-label)[^"]*"[^>]*>([^<]+)<\/span>/i);
     if (markers) {
@@ -298,6 +524,84 @@ function detectAuthors(url, html, pick) {
       return lower.includes('the associated press') || lower.includes('associated press');
     }
 
+    // 🎯 HEALTHY DEBATE-SPECIFIC AUTHOR EXTRACTION (EARLY PRIORITY)
+    if (host === 'healthydebate.ca') {
+      // Look for the specific author structure: <div class="author">...<span class="author-list"><a>Author Name</a>
+      const healthyDebateAuthorMatch = html.match(/<div[^>]*class="[^"]*author[^"]*"[^>]*>[\s\S]*?<span[^>]*class="[^"]*author-list[^"]*"[^>]*>[\s\S]*?<a[^>]*href="[^"]*">([^<]+)<\/a>/i);
+      
+      if (healthyDebateAuthorMatch) {
+        const author = healthyDebateAuthorMatch[1].trim();
+        // Validate it's a reasonable author name
+        if (author.length > 2 && author.length < 50) {
+          return { 
+            authors: [cleanupAuthor(author)], 
+            wasAssociatedPress: false 
+          };
+        }
+      }
+      
+      // If no structured byline found, this is likely a Maddi Dellplain piece (staff writer)
+      return { 
+        authors: ['Maddi Dellplain'], 
+        wasAssociatedPress: false 
+      };
+    }
+
+    // 🎯 POLICY OPTIONS-SPECIFIC AUTHOR EXTRACTION
+    if (host === 'policyoptions.irpp.org') {
+      // Look for Policy Options specific pattern first
+      const policyOptionsMatch = html.match(/<span[^>]*class="[^"]*meta__author[^"]*"[^>]*>[\s\S]*?by&nbsp;\s*<a[^>]*href="[^"]*">([^<]+)<\/a>/i);
+      if (policyOptionsMatch) {
+        return { 
+          authors: [cleanupAuthor(policyOptionsMatch[1])], 
+          wasAssociatedPress: false 
+        };
+      }
+      
+      // Fallback: Look for any link in meta-author div
+      const authorLinkMatch = html.match(/<div[^>]*class="[^"]*meta-author[^"]*"[\s\S]*?<a[^>]*href="[^"]*authors[^"]*">([^<]+)<\/a>/i);
+      if (authorLinkMatch) {
+        return { 
+          authors: [cleanupAuthor(authorLinkMatch[1])], 
+          wasAssociatedPress: false 
+        };
+      }
+    }
+
+    // 🎯 GUARDIAN-SPECIFIC AUTHOR EXTRACTION 
+    if (host === 'theguardian.com') {
+      // Guardian meta tags contain URLs, but JSON-LD has the actual names
+      const jsonLdMatch = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i);
+      if (jsonLdMatch) {
+        try {
+          const cleaned = jsonLdMatch[1].replace(/[\x00-\x1F\x7F]/g, "");
+          const json = JSON.parse(cleaned);
+          
+          // Handle both single objects and arrays
+          const jsonArray = Array.isArray(json) ? json : [json];
+          
+          for (const obj of jsonArray) {
+            if (obj.author) {
+              if (Array.isArray(obj.author)) {
+                const originalTexts = obj.author.map(a => a.name || a);
+                const wasAP = originalTexts.some(checkForAssociatedPress);
+                const authors = originalTexts.map(cleanupAuthor).filter(Boolean);
+                if (authors.length) return { authors, wasAssociatedPress: wasAP };
+              } else if (typeof obj.author === 'object' && obj.author.name) {
+                const originalText = obj.author.name;
+                return { 
+                  authors: [cleanupAuthor(originalText)], 
+                  wasAssociatedPress: checkForAssociatedPress(originalText) 
+                };
+              }
+            }
+          }
+        } catch (e) {
+          // JSON parsing failed, continue to fallback
+        }
+      }
+    }
+
     // 🎯 POSTMEDIA-SPECIFIC AUTHOR EXTRACTION
     const isPM = POSTMEDIA.some(d => host.endsWith(d));
     
@@ -309,19 +613,41 @@ function detectAuthors(url, html, pick) {
           const cleaned = jsonLdMatch[1].replace(/[\x00-\x1F\x7F]/g, "");
           const json = JSON.parse(cleaned);
           
-          if (json.author && Array.isArray(json.author)) {
-            const originalTexts = json.author.map(a => a.name || a);
-            const wasAP = originalTexts.some(checkForAssociatedPress);
-            const authors = originalTexts.map(cleanupAuthor).filter(Boolean);
-            if (authors.length) return { authors, wasAssociatedPress: wasAP };
-          } else if (json.author && typeof json.author === 'object' && json.author.name) {
-            const originalText = json.author.name;
-            return { 
-              authors: [cleanupAuthor(originalText)], 
-              wasAssociatedPress: checkForAssociatedPress(originalText) 
-            };
+          // Helper function to extract author from a single object
+          function extractAuthorFromObject(obj) {
+            if (obj.author && Array.isArray(obj.author)) {
+              const originalTexts = obj.author.map(a => a.name || a);
+              const wasAP = originalTexts.some(checkForAssociatedPress);
+              const authors = originalTexts.map(cleanupAuthor).filter(Boolean);
+              if (authors.length) return { authors, wasAssociatedPress: wasAP };
+            } else if (obj.author && typeof obj.author === 'object' && obj.author.name) {
+              const originalText = obj.author.name;
+              return { 
+                authors: [cleanupAuthor(originalText)], 
+                wasAssociatedPress: checkForAssociatedPress(originalText) 
+              };
+            }
+            return null;
           }
-        } catch (_) {}
+          
+          // Handle array of JSON-LD objects (like Healthing.ca)
+          if (Array.isArray(json)) {
+            for (const item of json) {
+              const result = extractAuthorFromObject(item);
+              if (result) {
+                return result;
+              }
+            }
+          } else {
+            // Handle single JSON-LD object
+            const result = extractAuthorFromObject(json);
+            if (result) {
+              return result;
+            }
+          }
+        } catch (e) {
+          // JSON parsing failed
+        }
       }
       
       // Try parsely-author meta tag as fallback
@@ -390,26 +716,11 @@ function detectAuthors(url, html, pick) {
       return { authors, wasAssociatedPress: wasAP };
     }
 
-    // 3. Try common byline patterns in HTML (last resort)
-    const bylinePatterns = [
-      /<div[^>]*class="[^"]*byline[^"]*"[^>]*>([^<]+)<\/div>/i,
-      /<div[^>]*class="[^"]*author[^"]*"[^>]*>([^<]+)<\/div>/i,
-      /<span[^>]*class="[^"]*byline[^"]*"[^>]*>([^<]+)<\/span>/i,
-      /<span[^>]*class="[^"]*author[^"]*"[^>]*>([^<]+)<\/span>/i,
-      /<a[^>]*rel="author"[^>]*>([^<]+)<\/a>/i,
-      /By\s+([^<\n]+?)(?:\s*[,<]|$)/i
-    ];
-
-    for (const pattern of bylinePatterns) {
-      const match = html.match(pattern);
-      if (match) {
-        const originalText = match[1];
-        const wasAP = checkForAssociatedPress(originalText);
-        const authors = originalText.split(/,|\sand\s/).map(a => 
-          cleanupAuthor(a.replace(/^by\s+|^By\s+/, '').trim())
-        ).filter(Boolean);
-        if (authors.length) return { authors, wasAssociatedPress: wasAP };
-      }
+    // 3. Try improved HTML author detection (last resort)
+    const htmlAuthor = detectAuthorFromHtml(html, url);
+    if (htmlAuthor) {
+      const wasAP = checkForAssociatedPress(htmlAuthor);
+      return { authors: [htmlAuthor], wasAssociatedPress: wasAP };
     }
 
     return { authors: ['TKTKTK'], wasAssociatedPress: false }; // Default to placeholder if nothing found
@@ -437,26 +748,8 @@ export async function scrapeInfo(url, cf = { cacheTtl: 300 }, depth = 0, visited
   // Get publication name early
   let publication = getPublicationName(url);
 
-  const headers = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-    "Accept-Language": "en-US,en;q=0.5",
-    "Accept-Encoding": "gzip, deflate, br",
-    "DNT": "1",
-    "Connection": "keep-alive",
-    "Upgrade-Insecure-Requests": "1",
-    "Sec-Fetch-Dest": "document",
-    "Sec-Fetch-Mode": "navigate",
-    "Sec-Fetch-Site": "none",
-    "Sec-Fetch-User": "?1",
-    "Cache-Control": "max-age=0"
-  };
-
-  if (isCBC) headers.Referer = "https://www.cbc.ca/";
-  if (isPM) {
-    headers.Referer = `https://${host}/`;
-    headers["Sec-Fetch-Site"] = "same-origin";
-  }
+  // 🎯 USE NEW 2025 OPERA-POWERED BROWSER HEADERS UTILITY
+  const headers = getSiteOptimizedHeaders(url);
 
   const ctrl = new AbortController();
   const tid = setTimeout(() => ctrl.abort("timeout"), isPM ? 8000 : 4000);
@@ -530,8 +823,15 @@ export async function scrapeInfo(url, cf = { cacheTtl: 300 }, depth = 0, visited
   if (isPM) {
     // Helper function for Postmedia author extraction
     function extractPostmediaAuthors(json) {
-      // Try JSON-LD author array first
-      if (json && json.author && Array.isArray(json.author)) {
+      // 🎯 HEALTHING.CA SPECIFIC: Handle JSON-LD array structure
+      if (host === 'healthing.ca' && Array.isArray(json)) {
+        const newsArticle = json.find(item => item['@type'] === 'NewsArticle');
+        if (newsArticle) {
+          if (newsArticle.author && newsArticle.author.name) {
+            return [cleanupAuthor(newsArticle.author.name)];
+          }
+        }
+      } else if (json && json.author && Array.isArray(json.author)) {
         const authors = json.author.map(a => cleanupAuthor(a.name || a)).filter(Boolean);
         if (authors.length) return authors;
       } else if (json && json.author && typeof json.author === 'object' && json.author.name) {
@@ -553,14 +853,28 @@ export async function scrapeInfo(url, cf = { cacheTtl: 300 }, depth = 0, visited
         const cleaned = jsonLdMatch[1].replace(/[\x00-\x1F\x7F]/g, "");
         const json = JSON.parse(cleaned);
 
-        const head = json.headline?.trim();
-        const img = Array.isArray(json.image)
-          ? json.image[0]?.url?.trim()
-          : json.image?.url?.trim();
+        let head, img;
+        
+        // 🎯 HEALTHING.CA SPECIFIC: Handle array structure
+        if (host === 'healthing.ca' && Array.isArray(json)) {
+          const newsArticle = json.find(item => item['@type'] === 'NewsArticle');
+          if (newsArticle) {
+            head = newsArticle.headline?.trim();
+            img = Array.isArray(newsArticle.image)
+              ? newsArticle.image[0]?.url?.trim()
+              : newsArticle.image?.url?.trim();
+          }
+        } else {
+          // Standard Postmedia structure
+          head = json.headline?.trim();
+          img = Array.isArray(json.image)
+            ? json.image[0]?.url?.trim()
+            : json.image?.url?.trim();
+        }
 
         if (head && img) {
           // Get article type and authors before returning
-          const articleType = detectArticleType(url, html, pick);
+          const articleType = detectArticleType(url, html, pick, head);
           const authors = extractPostmediaAuthors(json);
           return {
             headline: cleanupHeadline(head, host),
@@ -580,7 +894,7 @@ export async function scrapeInfo(url, cf = { cacheTtl: 300 }, depth = 0, visited
     
     if (ogTitle && ogImage) {
       // Get article type and authors before returning
-      const articleType = detectArticleType(url, html, pick);
+      const articleType = detectArticleType(url, html, pick, ogTitle);
       const authors = extractPostmediaAuthors(null);
       return { 
         headline: cleanupHeadline(ogTitle, host),
@@ -601,7 +915,7 @@ export async function scrapeInfo(url, cf = { cacheTtl: 300 }, depth = 0, visited
       
       if (titleMatch && imgMatch) {
         // Get article type and authors before returning
-        const articleType = detectArticleType(url, html, pick);
+        const articleType = detectArticleType(url, html, pick, titleMatch[1].replace(/<[^>]*>/g, '').trim());
         const authors = extractPostmediaAuthors(null);
         return {
           headline: cleanupHeadline(titleMatch[1].replace(/<[^>]*>/g, '').trim(), host),
@@ -691,11 +1005,20 @@ export async function scrapeInfo(url, cf = { cacheTtl: 300 }, depth = 0, visited
     }
   }
 
-  // If no image from JSON-LD, try meta tags
+  // If no image from JSON-LD, try content-first extraction, then fallback to meta tags
   if (!img) {
-    img = pick("twitter:image", "twitter:image:src", "og:image", "og:image:url", "og:image:secure_url") ||
-          pickRev("twitter:image") ||
-          pickRev("og:image");
+    // 🎯 CONTENT-FIRST: Try to find the first image after h1 (article content)
+    const contentImg = extractContentImage(html, url);
+    if (contentImg) {
+      img = contentImg;
+      console.log('Found content image after h1:', img);
+    } else {
+      // Fallback to social preview images
+      img = pick("twitter:image", "twitter:image:src", "og:image", "og:image:url", "og:image:secure_url") ||
+            pickRev("twitter:image") ||
+            pickRev("og:image");
+      console.log('Using social preview image:', img);
+    }
   }
 
   // For Postmedia sites, try to get image from link tags
@@ -747,7 +1070,7 @@ export async function scrapeInfo(url, cf = { cacheTtl: 300 }, depth = 0, visited
   img = getHighQualityImageUrl(decode(img || "").trim(), host);
 
   // Get article type
-  const articleType = detectArticleType(url, html, pick);
+  const articleType = detectArticleType(url, html, pick, head);
 
   // Get authors
   const authorsInfo = detectAuthors(url, html, pick);
@@ -762,9 +1085,9 @@ export async function scrapeInfo(url, cf = { cacheTtl: 300 }, depth = 0, visited
     const h1Match = html.match(/<h1[^>]*>([\s\S]+?)<\/h1>/i);
     if (h1Match) {
       const headline = h1Match[1].replace(/<[^>]*>/g, "").trim();
-      const articleType = detectArticleType(url, html, pick);
+      const articleType = detectArticleType(url, html, pick, headline);
       return {
-        headline: cleanupHeadline(headline, host),
+        headline: cleanupHeadline(head, host),
         image: '', // We'll implement image extraction later
         url,
         publication,

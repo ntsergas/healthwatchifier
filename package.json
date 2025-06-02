@@ -10,7 +10,11 @@
 		"prepare": "husky install",
 		"lint": "eslint .",
 		"format": "prettier --write .",
-		"test": "vitest"
+		"test": "vitest",
+		"test:unit": "node test.unit.js",
+		"test:integration": "node test.js",
+		"test:tdd": "npm run test:unit && npm run test:integration",
+		"test:watch": "npm run test:unit -- --watch"
 	},
 	"devDependencies": {
 		"@cloudflare/vitest-pool-workers": "^0.8.19",

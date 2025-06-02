@@ -78,6 +78,7 @@ export const styles = /*css*/ `
     cursor: pointer;
     transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     text-align: center;
@@ -170,5 +171,19 @@ export const styles = /*css*/ `
   @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
+  }
+  .kbd-hint {
+    font-size: 0.7rem;
+    opacity: 0.6;
+    margin-top: 0.25rem;
+    font-weight: 400;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    transition: opacity 0.3s ease;
+  }
+  button:hover .kbd-hint {
+    opacity: 0.9;
   }
 `; 
