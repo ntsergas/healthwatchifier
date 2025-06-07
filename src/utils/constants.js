@@ -17,6 +17,7 @@ export const PUBLICATION_NAMES = {
   "calgarysun.com": "Calgary Sun",
   "edmontonsun.com": "Edmonton Sun",
   "ottawasun.com": "Ottawa Sun",
+  "lfpress.com": "London Free Press",
   "canada.com": "Canada.com",
 
   // Other Canadian Publications
@@ -60,4 +61,22 @@ export const PUBLICATION_NAMES = {
   "cidrap.umn.edu": "CIDRAP",
   "kffhealthnews.org": "KFF Health News",
   "statnews.com": "STAT"
-}; 
+};
+
+// Only domain we know is ALWAYS paywalled
+export const PAYWALLED_DOMAINS = [
+  'theglobeandmail.com'
+];
+
+// We'll rely on detection for all other domains
+
+export const HYBRID_PAYWALL_DOMAINS = [
+  'thestar.com'  // Mix of free and premium content
+];
+
+export const FREE_DOMAINS = [
+  'cbc.ca',
+  'globalnews.ca',
+  'healthydebate.ca',
+  // ... other known free domains ...
+]; 

@@ -1,6 +1,6 @@
 // import puppeteer from '@cloudflare/puppeteer';
 
-import { PUBLICATION_NAMES } from './constants.js';
+import { PUBLICATION_NAMES, PAYWALLED_DOMAINS } from './constants.js';
 import { detectOpinionFromUrl, detectOpinionFromTitle } from './articleTypeDetection.js';
 import { detectAuthorFromHtml } from './authorDetection.js';
 import { logger } from './logger.js';
@@ -22,9 +22,11 @@ const POSTMEDIA = [
   "vancouversun.com", "edmontonjournal.com", "calgaryherald.com",
   "leaderpost.com", "thestarphoenix.com", "windsorstar.com",
   "theprovince.com", "torontosun.com", "winnipegsun.com",
-  "calgarysun.com", "edmontonsun.com", "ottawasun.com", "canada.com",
+  "calgarysun.com", "edmontonsun.com", "lfpress.com", "ottawasun.com", "canada.com",
   "healthing.ca",
 ];
+
+const paywallLogger = logger.child('PAYWALL');
 
 // Helper functions
 export function sanitizeUrl(input) {
@@ -89,8 +91,12 @@ function cleanupHeadline(headline, host) {
   headlineLogger.debug("After whitespace cleanup:", headline);
 
   // Remove site-specific suffixes
-  headline = headline.replace(/\s*\|\s*(CBC News|CBC Radio|CBC|Globalnews\.ca|CTV News|Toronto Star|The Globe and Mail|National Post|National|Vancouver Sun|Edmonton Journal|Montreal Gazette|The Trillium|Canada Healthwatch)\s*$/i, "");
+  headline = headline.replace(/\s*\|\s*(CBC News|CBC Radio|CBC|Globalnews\.ca|CTV News|Toronto Star|The Globe and Mail|National Post|National|Vancouver Sun|Edmonton Journal|Montreal Gazette|The Trillium|Canada Healthwatch|The Tyee)\s*$/i, "");
   headlineLogger.debug("After suffix removal:", headline);
+
+  // Remove Canadian Press specific suffixes (e.g., " | BC | thecanadianpressnews.ca")
+  headline = headline.replace(/\s*\|\s*[A-Z]{2,}\s*\|\s*thecanadianpressnews\.ca\s*$/i, "");
+  headlineLogger.debug("After Canadian Press suffix removal:", headline);
 
   headline = headline.replace(/\s+-\s+(National|Healthy Debate|The Globe and Mail|Canada Healthwatch)\s*$/i, "");
   headlineLogger.debug("After dash suffix removal:", headline);
@@ -232,6 +238,11 @@ function extractContentImage(html, url) {
     
     if (host === 'healthydebate.ca') {
       // Healthy Debate: Social previews are more reliable than content parsing
+      return null; // Let it fall back to social preview extraction
+    }
+
+    if (host === 'cabinradio.ca') {
+      // Cabin Radio: Social previews are more reliable than content parsing
       return null; // Let it fall back to social preview extraction
     }
     
@@ -392,10 +403,10 @@ function getPublicationName(url) {
       }
     }
     
-    // Return null if no match found
-    return null;
+    // Return placeholder if no match found
+    return "Outlet: TKTKTK";
   } catch {
-    return null;
+    return "Outlet: TKTKTK";
   }
 }
 
@@ -496,7 +507,7 @@ function detectArticleType(url, html, pick, headline = '') {
 function cleanupAuthor(author) {
   if (!author || typeof author !== 'string') return author;
   
-  return author
+  return decode(author)
     // Remove trailing publication suffixes
     .replace(/\s+The\s+Associated\s+Press$/i, '')
     .replace(/\s+-\s+ICI\.Radio-Canada\.ca$/i, '')
@@ -504,6 +515,7 @@ function cleanupAuthor(author) {
     // Clean up common prefixes and suffixes
     .replace(/^Zone\s+\w+\s+-\s+/i, '') // Remove "Zone Politique - " style prefixes
     .replace(/^Author:\s*/i, '') // Remove "Author:" prefix
+    .replace(/\s*(?:Contributor|Contributors)\s*$/i, '') // Remove Contributor/Contributors suffix
     .trim();
 }
 
@@ -514,7 +526,7 @@ function detectAuthors(url, html, pick) {
     const urlObj = new URL(url);
     const host = urlObj.hostname.replace(/^www\./, '');
     if (host === 'justanoldcountrydoctor.com' || host === 'cidrap.umn.edu') {
-      return { authors: ['TKTKTK'], wasAssociatedPress: false };
+      return { authors: ['Author: TKTKTK'], wasAssociatedPress: false };
     }
 
     // Helper function to check if original text contains Associated Press
@@ -670,10 +682,10 @@ function detectAuthors(url, html, pick) {
         
         // If JSON-LD explicitly says no authors, respect that
         if (json.authors && Array.isArray(json.authors) && json.authors.length === 0) {
-          return { authors: ['TKTKTK'], wasAssociatedPress: false };
+          return { authors: ['Author: TKTKTK'], wasAssociatedPress: false };
         }
         if (json.byline === null || json.byline === "") {
-          return { authors: ['TKTKTK'], wasAssociatedPress: false };
+          return { authors: ['Author: TKTKTK'], wasAssociatedPress: false };
         }
         
         // Handle both single author and multiple authors
@@ -705,7 +717,7 @@ function detectAuthors(url, html, pick) {
     // 2. Check meta tags for explicit empty indicators
     const metaAuthors = pick('article:author', 'author', 'dc.creator', 'byl');
     if (metaAuthors === "" || metaAuthors === null) {
-      return { authors: ['TKTKTK'], wasAssociatedPress: false };
+      return { authors: ['Author: TKTKTK'], wasAssociatedPress: false };
     }
     if (metaAuthors) {
       const wasAP = checkForAssociatedPress(metaAuthors);
@@ -723,10 +735,83 @@ function detectAuthors(url, html, pick) {
       return { authors: [htmlAuthor], wasAssociatedPress: wasAP };
     }
 
-    return { authors: ['TKTKTK'], wasAssociatedPress: false }; // Default to placeholder if nothing found
+    return { authors: ['Author: TKTKTK'], wasAssociatedPress: false }; // Default to placeholder if nothing found
   } catch (error) {
     console.error('Error detecting authors:', error);
-    return { authors: ['TKTKTK'], wasAssociatedPress: false }; // Return placeholder on error
+    return { authors: ['Author: TKTKTK'], wasAssociatedPress: false }; // Return placeholder on error
+  }
+}
+
+function isPaywalled(url, html, pick) {
+  try {
+    const host = new URL(url).hostname.replace(/^www\./, '');
+    
+    // 1. Check Globe and Mail (always paywalled)
+    if (PAYWALLED_DOMAINS.some(domain => host.endsWith(domain))) {
+      paywallLogger.debug('Domain-based paywall detection', { host });
+      return true;
+    }
+
+    // 2. Special handling for The Star
+    if (host.endsWith('thestar.com')) {
+      // Check for subscriber/premium indicators
+      const isSubscriberContent = 
+        html.includes('For Subscribers') ||
+        html.includes('class="basic-paywall"') ||
+        html.includes('class="premium-paywall"') ||
+        html.includes('data-access="premium"') ||
+        html.includes('data-access="metered"');
+
+      if (isSubscriberContent) {
+        paywallLogger.debug('Toronto Star premium content detected');
+        return true;
+      }
+
+      // Check for explicit free content markers
+      const isFreeContent = 
+        html.includes('data-access="free"') ||
+        html.includes('class="free-content"');
+
+      if (isFreeContent) {
+        paywallLogger.debug('Toronto Star free content detected');
+        return false;
+      }
+    }
+
+    // 3. Check meta tags (reliable when present)
+    const metaAccessible = pick('isAccessibleForFree');
+    const contentTier = pick('article:content_tier');
+    
+    if (metaAccessible === 'false' || contentTier === 'premium' || contentTier === 'metered') {
+      paywallLogger.debug('Meta-based paywall detection', { metaAccessible, contentTier });
+      return true;
+    }
+
+    // 4. Content analysis (for dynamic paywalls)
+    const paywallPhrases = [
+      'subscribe to continue reading',
+      'sign in to keep reading',
+      'subscribe to read more',
+      'subscribers only',
+      'premium content',
+      'subscribe now to read'
+    ];
+
+    const hasPaywallPhrase = paywallPhrases.some(phrase => 
+      html.toLowerCase().includes(phrase)
+    );
+
+    if (hasPaywallPhrase) {
+      paywallLogger.debug('Content-based paywall detection');
+      return true;
+    }
+
+    return false;
+
+  } catch (error) {
+    paywallLogger.error('Error in paywall detection:', error);
+    // If we can't determine, assume not paywalled
+    return false;
   }
 }
 
@@ -844,7 +929,7 @@ export async function scrapeInfo(url, cf = { cacheTtl: 300 }, depth = 0, visited
         return [cleanupAuthor(parselyAuthor)];
       }
       
-      return ['TKTKTK']; // Default fallback
+      return ['Author: TKTKTK']; // Default fallback
     }
 
     const jsonLdMatch = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i);
@@ -889,8 +974,8 @@ export async function scrapeInfo(url, cf = { cacheTtl: 300 }, depth = 0, visited
     }
 
     // Try meta tags as fallback
-    const ogTitle = (html.match(/<meta[^>]+property=["']og:title["'][^>]*content=["']([^"']+)["']/i) || [])[1];
-    const ogImage = (html.match(/<meta[^>]+property=["']og:image["'][^>]*content=["']([^"']+)["']/i) || [])[1];
+    const ogTitle = (html.match(/<meta[^>]+property=["']og:title["'][^>]*content=(["'])([^]*?)\\1[^>]*>/i) || [])[2];
+    const ogImage = (html.match(/<meta[^>]+property=["']og:image["'][^>]*content=(["'])([^]*?)\\1[^>]*>/i) || [])[2];
     
     if (ogTitle && ogImage) {
       // Get article type and authors before returning
@@ -940,9 +1025,9 @@ export async function scrapeInfo(url, cf = { cacheTtl: 300 }, depth = 0, visited
 
     // Also try og:title as backup
     if (!head) {
-      const ogTitleMatch = html.match(/<meta[^>]+property=["']og:title["'][^>]*content=["']([^"']+)["']/i);
+      const ogTitleMatch = html.match(/<meta[^>]+property=["']og:title["'][^>]*content=(["'])([^]*?)\\1[^>]*>/i);
       if (ogTitleMatch) {
-        head = ogTitleMatch[1];
+        head = ogTitleMatch[2];
       }
     }
 
@@ -965,7 +1050,7 @@ export async function scrapeInfo(url, cf = { cacheTtl: 300 }, depth = 0, visited
   // If still no headline, try other meta tags
   if (!head) {
     console.log("Trying meta tags for headline...");
-    const ogTitle = (html.match(/<meta[^>]+property=["']og:title["'][^>]*content=["']([^"']+)["']/i) || [])[1];
+    const ogTitle = (html.match(/<meta[^>]+property=["']og:title["'][^>]*content=(["'])([^]*?)\\1[^>]*>/i) || [])[2];
     const titleTag = (html.match(/<title>([^<]+)<\/title>/i) || [])[1];
     console.log("Found og:title:", ogTitle);
     console.log("Found title tag:", titleTag);
@@ -1104,6 +1189,7 @@ export async function scrapeInfo(url, cf = { cacheTtl: 300 }, depth = 0, visited
     publication,
     articleType,
     authors: authorsInfo.authors,
-    wasAssociatedPress: authorsInfo.wasAssociatedPress
+    wasAssociatedPress: authorsInfo.wasAssociatedPress,
+    isPaywalled: isPaywalled(url, html, pick)
   };
 } 

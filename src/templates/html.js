@@ -17,11 +17,12 @@ export const htmlTemplate = ({ styles, script }) => /*html*/ `
       display: flex;
       gap: 0.75rem;
       margin-bottom: 1rem;
-    }
-    .publication-badge, .authors-badge {
-      display: inline-flex;
       align-items: center;
-      gap: 0.75rem;
+    }
+    .publication-badge, .authors-badge, .paywall-badge {
+      display: none;
+      align-items: center;
+      gap: 0.5rem;
       background: #2a2b2f;
       border: 1px solid #3d3d47;
       border-radius: 12px;
@@ -32,9 +33,22 @@ export const htmlTemplate = ({ styles, script }) => /*html*/ `
       transform: translateY(-10px);
       transition: all 0.3s ease;
     }
-    .publication-badge.visible, .authors-badge.visible {
+    .publication-badge.visible, .authors-badge.visible, .paywall-badge.visible {
       opacity: 1;
       transform: translateY(0);
+    }
+    .paywall-badge {
+      order: 3;
+    }
+    .paywall-badge.paywall-free {
+      background: #1a472a;
+      border-color: #2d6a4f;
+      color: #4ade80;
+    }
+    .paywall-badge.paywall-locked {
+      background: #471a1a;
+      border-color: #6a2d2d;
+      color: #de4a4a;
     }
     .publication-badge svg, .authors-badge svg {
       width: 16px;
@@ -77,19 +91,15 @@ export const htmlTemplate = ({ styles, script }) => /*html*/ `
       </div>
       <div class="output-group">
         <div class="badge-container">
-          <div id="publication" class="publication-badge" style="display: none;">
-            <svg viewBox="0 0 24 24">
-              <path d="M12 2L1 21h22L12 2zm0 3.45l6.52 11.33H5.48L12 5.45z"/>
-            </svg>
+          <div id="publication" class="publication-badge">
             <span class="publication-name"></span>
-            <div class="badge-divider"></div>
             <span class="article-type"></span>
           </div>
-          <div id="authors" class="authors-badge" style="display: none;">
-            <svg viewBox="0 0 24 24">
-              <path d="M12 11a4 4 0 1 0-4-4 4 4 0 0 0 4 4zm6 10a7 7 0 0 0-14 0"/>
-            </svg>
+          <div id="authors" class="authors-badge">
             <span class="authors-list"></span>
+          </div>
+          <div id="paywall" class="paywall-badge">
+            <span class="paywall-status"></span>
           </div>
         </div>
         <div class="label">Title</div>

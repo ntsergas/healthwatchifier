@@ -9,7 +9,7 @@ export async function handleHealthwatchify(request) {
       return errorResponse('No URL provided', 400);
     }
 
-    const { headline, image, url: cleanUrl, publication, articleType, authors } = await scrapeInfo(url);
+    const { headline, image, url: cleanUrl, publication, articleType, authors, wasAssociatedPress, isPaywalled } = await scrapeInfo(url);
     const text = `${headline} ${cleanUrl}\n\n${TAGLINE}`;
 
     return jsonResponse({
@@ -18,7 +18,9 @@ export async function handleHealthwatchify(request) {
       image,
       publication,
       articleType,
-      authors
+      authors,
+      wasAssociatedPress,
+      isPaywalled
     });
 
   } catch (error) {

@@ -6,6 +6,8 @@ export const clientScript = /*javascript*/ `
   const articleType = publicationBadge.querySelector('.article-type');
   const authorsBadge = $("authors");
   const authorsList = authorsBadge.querySelector('.authors-list');
+  const paywallBadge = $("paywall");
+  const paywallStatus = paywallBadge.querySelector('.paywall-status');
 
   // URL sanitization function
   function sanitizeUrl(input) {
@@ -55,11 +57,7 @@ export const clientScript = /*javascript*/ `
     $("out").value = "⏳ Fetching…";
     $("preview").style.display = "none";
     $("out").style.opacity = 0.5;
-    outputGroup.classList.remove('visible');
-    publicationBadge.style.display = 'none';
-    publicationBadge.classList.remove('visible');
-    authorsBadge.style.display = 'none';
-    authorsBadge.classList.remove('visible');
+    resetUI();
     
     // Create and animate progress ring
     const button = $("go");
@@ -138,6 +136,18 @@ export const clientScript = /*javascript*/ `
         setTimeout(() => authorsBadge.classList.add('visible'), 200);
       } else {
         authorsBadge.style.display = 'none';
+      }
+      
+      // Handle paywall badge
+      if (data.isPaywalled !== undefined) {
+        const icon = data.isPaywalled ? '🔒' : '✓';
+        const status = data.isPaywalled ? 'Paywalled' : 'Free';
+        paywallBadge.style.display = 'inline-flex';
+        paywallStatus.textContent = icon + ' ' + status;
+        paywallBadge.classList.add(data.isPaywalled ? 'paywall-locked' : 'paywall-free');
+        setTimeout(() => paywallBadge.classList.add('visible'), 100);
+      } else {
+        paywallBadge.style.display = 'none';
       }
       
       if (data.image) {
@@ -361,4 +371,34 @@ export const clientScript = /*javascript*/ `
       $("go").click();
     }
   });
+
+  // Reset UI state
+  function resetUI() {
+    outputGroup.classList.remove('visible');
+    publicationBadge.style.display = 'none';
+    publicationBadge.classList.remove('visible');
+    authorsBadge.style.display = 'none';
+    authorsBadge.classList.remove('visible');
+    paywallBadge.style.display = 'none';
+    paywallBadge.classList.remove('visible');
+    paywallBadge.classList.remove('paywall-free');
+    paywallBadge.classList.remove('paywall-locked');
+  }
+
+  // Update UI with response data
+  function updateUI(data) {
+    // ... existing code ...
+
+    // Update paywall badge
+    if (data.isPaywalled !== undefined) {
+      const icon = data.isPaywalled ? '🔒' : '✓';
+      const status = data.isPaywalled ? 'Paywalled' : 'Free';
+      paywallBadge.style.display = 'inline-flex';
+      paywallStatus.textContent = icon + ' ' + status;
+      paywallBadge.classList.add(data.isPaywalled ? 'paywall-locked' : 'paywall-free');
+      setTimeout(() => paywallBadge.classList.add('visible'), 100);
+    }
+
+    // ... existing code ...
+  }
 `; 
