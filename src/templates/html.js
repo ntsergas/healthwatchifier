@@ -104,8 +104,10 @@ export const htmlTemplate = ({ styles, script }) => /*html*/ `
         </div>
         <div class="label">Title</div>
         <input type="text" id="title" />
-        <div class="label">Output</div>
+        <div class="label output-label">Output</div>
         <textarea id="out"></textarea>
+        <div class="label caption-label">Image Caption</div>
+        <input type="text" id="caption" placeholder="Image caption will appear here..." />
         <img id="preview" alt="Article preview" />
       </div>
     </div>

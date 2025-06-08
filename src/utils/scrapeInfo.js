@@ -97,8 +97,8 @@ function cleanupHeadline(headline, host) {
   headline = headline.replace(/\s*\|\s*(CBC News|CBC Radio|CBC|Globalnews\.ca|CTV News|Toronto Star|The Globe and Mail|National Post|National|Vancouver Sun|Edmonton Journal|Montreal Gazette|The Trillium|Canada Healthwatch|The Tyee|Cancer|The Guardian|Global development|Canada)\s*$/i, "");
   headlineLogger.debug("After suffix removal", { headline });
 
-  // Remove Canadian Press specific suffixes (e.g., " | BC | thecanadianpressnews.ca")
-  headline = headline.replace(/\s*\|\s*[A-Z]{2,}\s*\|\s*thecanadianpressnews\.ca\s*$/i, "");
+  // Remove Canadian Press specific suffixes (e.g., " | BC | thecanadianpressnews.ca", " | Health News | thecanadianpressnews.ca")
+  headline = headline.replace(/\s*\|\s*[A-Z][A-Za-z\s]*\s*\|\s*thecanadianpressnews\.ca\s*$/i, "");
   headlineLogger.debug("After Canadian Press suffix removal", { headline });
 
   headline = headline.replace(/\s+-\s+(National|Healthy Debate|The Globe and Mail|Canada Healthwatch|CANADIAN AFFAIRS)\s*$/i, "");
@@ -794,7 +794,80 @@ function isPaywalled(url, html, pick) {
       return true;
     }
 
-    // 4. Content analysis (for dynamic paywalls)
+    // 4. Postmedia-specific paywall detection
+    const POSTMEDIA = [
+      "nationalpost.com", "montrealgazette.com", "ottawacitizen.com",
+      "vancouversun.com", "edmontonjournal.com", "calgaryherald.com",
+      "leaderpost.com", "thestarphoenix.com", "windsorstar.com",
+      "theprovince.com", "torontosun.com", "winnipegsun.com",
+      "calgarysun.com", "edmontonsun.com", "lfpress.com", "ottawasun.com", "canada.com",
+      "healthing.ca", "stcatharinesstandard.ca"
+    ];
+    
+    const isPostmedia = POSTMEDIA.some(d => host.endsWith(d));
+    
+    if (isPostmedia) {
+      // For Postmedia, check for subscription barriers immediately after article content
+      // This distinguishes between promotional content (hidden) and actual content blocking
+      
+      // Check for explicit paywall indicators first
+      const actualPaywallIndicators = [
+        'class="paywall"',
+        'id="paywall"',
+        'data-paywall="true"',
+        'subscription-required',
+        'content-gate'
+      ];
+      
+      const hasActualPaywall = actualPaywallIndicators.some(indicator => 
+        html.toLowerCase().includes(indicator.toLowerCase())
+      );
+      
+      if (hasActualPaywall) {
+        paywallLogger.debug('Postmedia explicit paywall indicator detected');
+        return true;
+      }
+      
+      // Look for subscription content immediately after the article body
+      const articleMatch = html.match(/<article[^>]*>([\s\S]*?)<\/article>/i);
+      if (articleMatch) {
+        const afterArticleIndex = html.indexOf(articleMatch[0]) + articleMatch[0].length;
+        const afterArticle = html.substring(afterArticleIndex, afterArticleIndex + 3000).toLowerCase();
+        
+        // Check for subscription barriers right after article content (not promotional sidebars)
+        const hasPostArticleBarrier = (
+          afterArticle.includes('subscribe') || 
+          afterArticle.includes('premium') ||
+          afterArticle.includes('continue')
+        ) && !afterArticle.includes('class="intro-body__premium hidden"');
+        
+        if (hasPostArticleBarrier) {
+          paywallLogger.debug('Postmedia subscription barrier found after article content');
+          return true;
+        }
+      }
+      
+      // Very specific paywall phrases that indicate actual blocking
+      const definitePaywallPhrases = [
+        'this article is exclusive to subscribers',
+        'premium subscriber content only',
+        'subscription required to read this article',
+        'content blocked for non-subscribers'
+      ];
+      
+      for (const phrase of definitePaywallPhrases) {
+        if (html.toLowerCase().includes(phrase)) {
+          paywallLogger.debug('Postmedia definite paywall phrase detected', { phrase });
+          return true;
+        }
+      }
+      
+      // For Postmedia sites, default to free unless we have strong evidence of paywall
+      paywallLogger.debug('Postmedia site - no definitive paywall indicators found');
+      return false;
+    }
+
+    // 5. Content analysis (for non-Postmedia dynamic paywalls)
     const paywallPhrases = [
       'subscribe to continue reading',
       'sign in to keep reading',
@@ -974,7 +1047,9 @@ export async function scrapeInfo(url, cf = { cacheTtl: 300 }, depth = 0, visited
             url,
             publication,
             articleType,
-            authors
+            authors,
+            isPaywalled: isPaywalled(url, html, pick),
+            html
           };
         }
       } catch (_) {}
@@ -994,7 +1069,9 @@ export async function scrapeInfo(url, cf = { cacheTtl: 300 }, depth = 0, visited
         url,
         publication,
         articleType,
-        authors
+        authors,
+        isPaywalled: isPaywalled(url, html, pick),
+        html
       };
     }
 
@@ -1015,7 +1092,9 @@ export async function scrapeInfo(url, cf = { cacheTtl: 300 }, depth = 0, visited
           url,
           publication,
           articleType,
-          authors
+          authors,
+          isPaywalled: isPaywalled(url, html, pick),
+          html
         };
       }
     }
@@ -1182,7 +1261,8 @@ export async function scrapeInfo(url, cf = { cacheTtl: 300 }, depth = 0, visited
         image: '', // We'll implement image extraction later
         url,
         publication,
-        articleType
+        articleType,
+        html
       };
     }
   }
@@ -1196,6 +1276,7 @@ export async function scrapeInfo(url, cf = { cacheTtl: 300 }, depth = 0, visited
     articleType,
     authors: authorsInfo.authors,
     wasAssociatedPress: authorsInfo.wasAssociatedPress,
-    isPaywalled: isPaywalled(url, html, pick)
+    isPaywalled: isPaywalled(url, html, pick),
+    html
   };
 } 

@@ -9,6 +9,7 @@ import { authorDetectionSuite } from './test/utils/authorDetection.test.js';
 import { policyOptionsSuite } from './test/utils/policyoptions.test.js';
 import { imageQualitySuite } from './test/utils/imageQuality.test.js';
 import { guardianSuite } from './test/utils/guardian.test.js';
+import { imageCaptionSuite } from './test/utils/imageCaptions.test.js';
 
 // Set up test environment
 const testLogger = logger.child('TEST-RUNNER');
@@ -32,7 +33,8 @@ async function runAllTests() {
     authorDetectionSuite,
     policyOptionsSuite,
     imageQualitySuite,
-    guardianSuite
+    guardianSuite,
+    imageCaptionSuite
   ];
 
   for (const suite of suites) {

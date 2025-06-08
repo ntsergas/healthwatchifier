@@ -49,7 +49,7 @@ export const styles = /*css*/ `
     box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
   }
   textarea {
-    min-height: 8rem;
+    min-height: 6rem;
   }
   .label {
     font-weight: 600;
@@ -63,7 +63,7 @@ export const styles = /*css*/ `
     display: flex;
     justify-content: center;
     gap: 1.5rem;
-    margin: 1rem 0 2rem 0;
+    margin: 0.25rem 0 1rem 0;
   }
   button {
     width: 160px;
@@ -185,5 +185,11 @@ export const styles = /*css*/ `
   }
   button:hover .kbd-hint {
     opacity: 0.9;
+  }
+  .label.output-label {
+    margin-top: 1.5rem;
+  }
+  .label.caption-label {
+    margin-top: 1.25rem;
   }
 `; 

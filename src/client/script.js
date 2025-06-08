@@ -55,6 +55,7 @@ export const clientScript = /*javascript*/ `
     
     // Reset output and show loading state
     $("out").value = "⏳ Fetching…";
+    $("caption").value = "";
     $("preview").style.display = "none";
     $("out").style.opacity = 0.5;
     resetUI();
@@ -118,6 +119,7 @@ export const clientScript = /*javascript*/ `
       // Set content
       $("out").value = data.text;
       $("title").value = data.title;
+      $("caption").value = data.caption || "";
       
       // Handle publication badge
       if (data.publication) {
@@ -191,6 +193,7 @@ export const clientScript = /*javascript*/ `
   $("copyAll").onclick = async () => {
     const output = $("out").value;
     const title = $("title").value;
+    const caption = $("caption").value;
     const url = $("link").value;
     const img = $("preview");
     const publication = publicationName.textContent;
@@ -202,7 +205,21 @@ export const clientScript = /*javascript*/ `
     const COPY_DELAY = 540; // Time between copy operations in ms
     
     try {
-      // 1. Copy Output
+      // 1. Copy Caption if exists
+      if (caption) {
+        await navigator.clipboard.writeText(caption);
+        button.textContent = "Caption Copied!";
+        gsap.to(button, {
+          scale: 1.15,
+          duration: 0.2,
+          ease: "back.out(3)",
+          yoyo: true,
+          repeat: 1
+        });
+        await new Promise(resolve => setTimeout(resolve, COPY_DELAY));
+      }
+
+      // 2. Copy Output
       await navigator.clipboard.writeText(output);
       button.textContent = "Output Copied!";
       gsap.to(button, {
@@ -214,7 +231,7 @@ export const clientScript = /*javascript*/ `
       });
       await new Promise(resolve => setTimeout(resolve, COPY_DELAY));
 
-      // 2. Copy Publication if exists
+      // 3. Copy Publication if exists
       if (publication && publicationBadge.style.display !== 'none') {
         await navigator.clipboard.writeText(publication);
         button.textContent = "Outlet Copied!";
@@ -228,7 +245,7 @@ export const clientScript = /*javascript*/ `
         await new Promise(resolve => setTimeout(resolve, COPY_DELAY));
       }
 
-      // 3. Copy Authors if exist
+      // 4. Copy Authors if exist
       if (authors && authorsBadge.style.display !== 'none') {
         await navigator.clipboard.writeText(authors);
         button.textContent = "Authors Copied!";
@@ -242,7 +259,7 @@ export const clientScript = /*javascript*/ `
         await new Promise(resolve => setTimeout(resolve, COPY_DELAY));
       }
 
-      // 4. Copy Title if exists
+      // 5. Copy Title if exists
       if (title) {
         await navigator.clipboard.writeText(title);
         button.textContent = "Title Copied!";
@@ -256,7 +273,7 @@ export const clientScript = /*javascript*/ `
         await new Promise(resolve => setTimeout(resolve, COPY_DELAY));
       }
 
-      // 5. Copy URL if exists
+      // 6. Copy URL if exists
       if (url) {
         await navigator.clipboard.writeText(url);
         button.textContent = "URL Copied!";
@@ -270,7 +287,7 @@ export const clientScript = /*javascript*/ `
         await new Promise(resolve => setTimeout(resolve, COPY_DELAY));
       }
 
-      // 6. Copy Image if exists and visible
+      // 7. Copy Image if exists and visible
       if (img.src && img.style.display !== "none") {
         button.textContent = "Copying Image...";
         try {
