@@ -23,10 +23,14 @@ const POSTMEDIA = [
   "leaderpost.com", "thestarphoenix.com", "windsorstar.com",
   "theprovince.com", "torontosun.com", "winnipegsun.com",
   "calgarysun.com", "edmontonsun.com", "lfpress.com", "ottawasun.com", "canada.com",
-  "healthing.ca",
+  "healthing.ca", "stcatharinesstandard.ca",
 ];
 
 const paywallLogger = logger.child('PAYWALL');
+const imageLogger = logger.child('IMAGE');
+const metaLogger = logger.child('META');
+const fetchLogger = logger.child('FETCH');
+const headlineLogger = logger.child('HEADLINE');
 
 // Helper functions
 export function sanitizeUrl(input) {
@@ -73,7 +77,7 @@ async function fetchWithRetry(url, options, retries = 3, baseDelay = 1000) {
       // If response isn't valid HTML, wait and retry
       await delay(baseDelay * Math.pow(2, i)); // Exponential backoff
     } catch (e) {
-      console.warn(`Attempt ${i + 1} failed:`, e.message);
+      fetchLogger.warn('Fetch attempt failed', { attempt: i + 1, error: e.message });
       if (i === retries - 1) throw e;
       await delay(baseDelay * Math.pow(2, i));
     }
@@ -84,26 +88,29 @@ async function fetchWithRetry(url, options, retries = 3, baseDelay = 1000) {
 // Helper function to clean up headlines
 function cleanupHeadline(headline, host) {
   if (!headline) return "(untitled)";
-  const headlineLogger = logger.child('HEADLINE');
 
-  headlineLogger.debug("Original headline:", headline);
+  headlineLogger.debug("Original headline", { headline });
   headline = headline.replace(/\s+/g, " ").trim();
-  headlineLogger.debug("After whitespace cleanup:", headline);
+  headlineLogger.debug("After whitespace cleanup", { headline });
 
   // Remove site-specific suffixes
-  headline = headline.replace(/\s*\|\s*(CBC News|CBC Radio|CBC|Globalnews\.ca|CTV News|Toronto Star|The Globe and Mail|National Post|National|Vancouver Sun|Edmonton Journal|Montreal Gazette|The Trillium|Canada Healthwatch|The Tyee)\s*$/i, "");
-  headlineLogger.debug("After suffix removal:", headline);
+  headline = headline.replace(/\s*\|\s*(CBC News|CBC Radio|CBC|Globalnews\.ca|CTV News|Toronto Star|The Globe and Mail|National Post|National|Vancouver Sun|Edmonton Journal|Montreal Gazette|The Trillium|Canada Healthwatch|The Tyee|Cancer|The Guardian|Global development|Canada)\s*$/i, "");
+  headlineLogger.debug("After suffix removal", { headline });
 
   // Remove Canadian Press specific suffixes (e.g., " | BC | thecanadianpressnews.ca")
   headline = headline.replace(/\s*\|\s*[A-Z]{2,}\s*\|\s*thecanadianpressnews\.ca\s*$/i, "");
-  headlineLogger.debug("After Canadian Press suffix removal:", headline);
+  headlineLogger.debug("After Canadian Press suffix removal", { headline });
 
-  headline = headline.replace(/\s+-\s+(National|Healthy Debate|The Globe and Mail|Canada Healthwatch)\s*$/i, "");
-  headlineLogger.debug("After dash suffix removal:", headline);
+  headline = headline.replace(/\s+-\s+(National|Healthy Debate|The Globe and Mail|Canada Healthwatch|CANADIAN AFFAIRS)\s*$/i, "");
+  headlineLogger.debug("After dash suffix removal", { headline });
+
+  // Remove NPR-specific suffix
+  headline = headline.replace(/\s*:\s*Shots\s*-\s*Health\s+News\s*:\s*NPR\s*$/i, "");
+  headlineLogger.debug("After NPR suffix removal", { headline });
 
   // Remove common prefixes
   headline = headline.replace(/^(WATCH|LISTEN|READ|EXCLUSIVE|UPDATE|OPINION):\s+/i, "");
-  headlineLogger.debug("After prefix removal:", headline);
+  headlineLogger.debug("After prefix removal", { headline });
 
   // Fix common encoding issues
   headline = headline
@@ -111,10 +118,10 @@ function cleanupHeadline(headline, host) {
     .replace(/[\u201C\u201D]/g, '"')
     .replace(/\s*\|\s*$/g, "")
     .replace(/\s*\.{3,}\s*$/g, "");
-  headlineLogger.debug("After encoding fixes:", headline);
+  headlineLogger.debug("After encoding fixes", { headline });
 
   const final = decode(headline);
-  headlineLogger.debug("Final headline:", final);
+  headlineLogger.debug("Final headline", { final });
   return final;
 }
 
@@ -277,7 +284,7 @@ function extractContentImage(html, url) {
     return findFirstValidImage(contentAfterH1, url);
     
   } catch (e) {
-    console.warn('Error extracting content image:', e.message);
+    imageLogger.warn('Error extracting content image', { error: e.message });
     return null;
   }
 }
@@ -312,14 +319,14 @@ function findFirstValidImage(content, url) {
       if (urlObj.hostname.includes('cloudfront.net')) {
         const pathname = urlObj.pathname;
         if (pathname.length < 20 || (!pathname.includes('.') && pathname.split('/').pop().length < 20)) {
-          console.log('Skipping broken CloudFront URL:', imgUrl);
+          imageLogger.debug('Skipping broken CloudFront URL', { imgUrl });
           continue;
         }
       }
       
       // Reject URLs that are too short to be valid image URLs
       if (imgUrl.length < 50) {
-        console.log('Skipping too-short URL:', imgUrl);
+        imageLogger.debug('Skipping too-short URL', { imgUrl });
         continue;
       }
     } catch (e) {
@@ -345,7 +352,7 @@ function findFirstValidImage(content, url) {
         fullImgTag.includes('class="authorprofile-image"') ||
         fullImgTag.includes('authorprofile-image') ||
         fullImgTag.includes('author-image')) {
-      console.log('Skipping author/byline/non-content image:', imgUrl);
+      imageLogger.debug('Skipping author/byline/non-content image', { imgUrl });
       continue;
     }
     
@@ -366,7 +373,7 @@ function findFirstValidImage(content, url) {
       const width = parseInt(widthMatch[1]);
       const height = parseInt(heightMatch[1]);
       if (width < 200 || height < 150) {
-        console.log(`Skipping small image (${width}x${height}):`, imgUrl);
+        imageLogger.debug('Skipping small image', { width, height, imgUrl });
         continue;
       }
     }
@@ -498,7 +505,7 @@ function detectArticleType(url, html, pick, headline = '') {
     // Default to 'news' if no opinion markers found
     return 'news';
   } catch (e) {
-    console.warn('Error detecting article type:', e);
+    logger.warn('Error detecting article type', { error: e });
     return 'news'; // Default to news if detection fails
   }
 }
@@ -737,7 +744,7 @@ function detectAuthors(url, html, pick) {
 
     return { authors: ['Author: TKTKTK'], wasAssociatedPress: false }; // Default to placeholder if nothing found
   } catch (error) {
-    console.error('Error detecting authors:', error);
+    logger.error('Error detecting authors', { error });
     return { authors: ['Author: TKTKTK'], wasAssociatedPress: false }; // Return placeholder on error
   }
 }
@@ -859,7 +866,7 @@ export async function scrapeInfo(url, cf = { cacheTtl: 300 }, depth = 0, visited
       ).text();
     }
   } catch (e) {
-    console.error(`Failed to fetch ${url}:`, e.message);
+    fetchLogger.error('Failed to fetch URL', { url, error: e.message });
     if (!isPM) throw e;
   } finally {
     clearTimeout(tid);
@@ -872,13 +879,13 @@ export async function scrapeInfo(url, cf = { cacheTtl: 300 }, depth = 0, visited
   // Helper functions for meta tag extraction (moved up for use in Postmedia parser)
   function pick(...names) {
     for (const n of names) {
-      console.log("Checking meta tag:", n);
+      metaLogger.debug("Checking meta tag", { tag: n });
       
       // Original regex for properly formatted HTML
       const re = new RegExp(`<meta[^>]+(?:property|name)=["']?${n}["']?[^>]*content=(["'])([\\s\\S]*?)\\1`, "i");
       const match = re.exec(html);
       if (match) {
-        console.log("Found match for", n, ":", match[2].trim());
+        metaLogger.debug("Found meta tag match", { tag: n, content: match[2].trim() });
         return match[2].trim();
       }
       
@@ -887,7 +894,7 @@ export async function scrapeInfo(url, cf = { cacheTtl: 300 }, depth = 0, visited
       const malformedRe = new RegExp(`<meta[^>]*content=(["'])([^"'<>]{1,200}?)\\1\\s*(?:property|name)=["']?${n}["']?`, "i");
       const malformedMatch = malformedRe.exec(html);
       if (malformedMatch) {
-        console.log("Found malformed match for", n, ":", malformedMatch[2].trim());
+        metaLogger.debug("Found malformed meta tag match", { tag: n, content: malformedMatch[2].trim() });
         return malformedMatch[2].trim();
       }
     }
@@ -895,11 +902,11 @@ export async function scrapeInfo(url, cf = { cacheTtl: 300 }, depth = 0, visited
   }
 
   function pickRev(n) {
-    console.log("Checking reversed meta tag:", n);
+    metaLogger.debug("Checking reversed meta tag", { tag: n });
     const re = new RegExp(`<meta[^>]*content=(["'])([\\s\\S]*?)\\1[^>]*(?:property|name)=["']?${n}["']?`, "i");
     const match = re.exec(html);
     if (match) {
-      console.log("Found reversed match for", n, ":", match[2].trim());
+      metaLogger.debug("Found reversed meta tag match", { tag: n, content: match[2].trim() });
     }
     return match ? match[2].trim() : "";
   }
@@ -1041,7 +1048,7 @@ export async function scrapeInfo(url, cf = { cacheTtl: 300 }, depth = 0, visited
             head = data.headline;
           }
         } catch (e) {
-          console.error("Failed to parse JSON-LD:", e.message);
+          logger.error("Failed to parse JSON-LD", { error: e.message });
         }
       }
     }
@@ -1049,26 +1056,25 @@ export async function scrapeInfo(url, cf = { cacheTtl: 300 }, depth = 0, visited
 
   // If still no headline, try other meta tags
   if (!head) {
-    console.log("Trying meta tags for headline...");
+    headlineLogger.debug("Trying meta tags for headline");
     const ogTitle = (html.match(/<meta[^>]+property=["']og:title["'][^>]*content=(["'])([^]*?)\\1[^>]*>/i) || [])[2];
     const titleTag = (html.match(/<title>([^<]+)<\/title>/i) || [])[1];
-    console.log("Found og:title:", ogTitle);
-    console.log("Found title tag:", titleTag);
+    headlineLogger.debug("Meta tag results", { ogTitle, titleTag });
     head = ogTitle || titleTag;
   }
 
   // If still no headline, try other meta tags
   if (!head || head.length < 15) {
-    console.log("Trying additional meta tags...");
+    headlineLogger.debug("Trying additional meta tags");
     head = pick("twitter:title") || pickRev("og:title");
   }
 
   // If still no headline, try h1
   if (!head || head.length < 15 || /&#8217;?$/i.test(head) || /don$/.test(head) || head === "(untitled)") {
-    console.log("Trying h1 tag...");
+    headlineLogger.debug("Trying h1 tag");
     const h1 = html.match(/<h1[^>]*>([\s\S]+?)<\/h1>/i);
     if (h1) {
-      console.log("Found h1:", h1[1]);
+      headlineLogger.debug("Found h1", { content: h1[1] });
       head = h1[1].replace(/<[^>]*>/g, "").trim();
     }
   }
@@ -1085,7 +1091,7 @@ export async function scrapeInfo(url, cf = { cacheTtl: 300 }, depth = 0, visited
           img = data.image[0].url;
         }
       } catch (e) {
-        console.error("Failed to parse JSON-LD for image:", e.message);
+        logger.error("Failed to parse JSON-LD for image", { error: e.message });
       }
     }
   }
@@ -1096,13 +1102,13 @@ export async function scrapeInfo(url, cf = { cacheTtl: 300 }, depth = 0, visited
     const contentImg = extractContentImage(html, url);
     if (contentImg) {
       img = contentImg;
-      console.log('Found content image after h1:', img);
+      imageLogger.debug('Found content image after h1', { img });
     } else {
       // Fallback to social preview images
       img = pick("twitter:image", "twitter:image:src", "og:image", "og:image:url", "og:image:secure_url") ||
             pickRev("twitter:image") ||
             pickRev("og:image");
-      console.log('Using social preview image:', img);
+      imageLogger.debug('Using social preview image', { img });
     }
   }
 

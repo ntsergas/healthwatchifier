@@ -38,6 +38,8 @@ export const PUBLICATION_NAMES = {
   "thetyee.ca": "The Tyee",
   "nunatsiaq.com": "Nunatsiaq",
   "canadianaffairs.news": "Canadian Affairs",
+  "stcatharinesstandard.ca": "St Catherines Standard",
+  "thespec.com": "The Hamilton Spectator",
 
   // International Publications
   "theguardian.com": "The Guardian",
@@ -54,6 +56,7 @@ export const PUBLICATION_NAMES = {
   "motherjones.com": "Mother Jones",
   "nbcnews.com": "NBC News",
   "arstechnica.com": "Ars Technica",
+  "bloomberg.com": "Bloomberg",
   
   // Medical/Health Publications
   "justanoldcountrydoctor.com": "justanoldcountrydoctor",
@@ -65,7 +68,10 @@ export const PUBLICATION_NAMES = {
 
 // Only domain we know is ALWAYS paywalled
 export const PAYWALLED_DOMAINS = [
-  'theglobeandmail.com'
+  'theglobeandmail.com',
+  'stcatharinesstandard.ca',
+  'thespec.com',
+  'bloomberg.com'
 ];
 
 // We'll rely on detection for all other domains

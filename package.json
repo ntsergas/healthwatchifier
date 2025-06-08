@@ -1,40 +1,15 @@
 {
-	"name": "healthwatchifier",
-	"version": "3.3.1",
-	"description": "A tool to format news articles for Healthwatch",
-	"private": true,
+	"name": "hamilton-cityguide",
+	"version": "1.0.0",
+	"description": "Municipal election information tool for Hamilton, Ontario",
+	"main": "index.js",
 	"scripts": {
-		"deploy": "wrangler deploy",
-		"dev": "wrangler dev",
-		"start": "wrangler dev",
-		"prepare": "husky install",
-		"lint": "eslint .",
-		"format": "prettier --write .",
-		"test": "vitest",
-		"test:unit": "node test.unit.js",
-		"test:integration": "node test.js",
-		"test:tdd": "npm run test:unit && npm run test:integration",
-		"test:watch": "npm run test:unit -- --watch"
+		"dev": "next dev",
+		"build": "next build",
+		"start": "next start",
+		"lint": "next lint"
 	},
-	"devDependencies": {
-		"@cloudflare/vitest-pool-workers": "^0.8.19",
-		"eslint": "^9.27.0",
-		"husky": "^9.1.7",
-		"lint-staged": "^16.0.0",
-		"prettier": "^3.5.3",
-		"vitest": "~3.0.7",
-		"wrangler": "^4.16.0"
-	},
-	"lint-staged": {
-		"*.{js,jsx,ts,tsx}": [
-			"eslint --fix",
-			"prettier --write"
-		],
-		"*.{json,md,yml,html,css}": [
-			"prettier --write"
-		]
-	},
-	"dependencies": {
-		"puppeteer": "^24.9.0"
-	}
+	"keywords": ["hamilton", "election", "municipal", "politics", "canada"],
+	"author": "",
+	"license": "ISC"
 }
