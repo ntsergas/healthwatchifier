@@ -1,15 +1,14 @@
 {
-	"name": "hamilton-cityguide",
+	"name": "healthwatchifier",
 	"version": "1.0.0",
-	"description": "Municipal election information tool for Hamilton, Ontario",
-	"main": "index.js",
+	"description": "A Cloudflare Workers application that helps format health news articles for social media sharing",
+	"main": "src/index.js",
 	"scripts": {
-		"dev": "next dev",
-		"build": "next build",
-		"start": "next start",
-		"lint": "next lint"
+		"dev": "wrangler dev",
+		"deploy": "wrangler deploy",
+		"test": "node test.unit.js"
 	},
-	"keywords": ["hamilton", "election", "municipal", "politics", "canada"],
+	"keywords": ["health", "news", "social-media", "cloudflare-workers", "canada"],
 	"author": "",
-	"license": "ISC"
+	"license": "MIT"
 }

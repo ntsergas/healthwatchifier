@@ -50,6 +50,15 @@ export const htmlTemplate = ({ styles, script }) => /*html*/ `
       border-color: #6a2d2d;
       color: #de4a4a;
     }
+    .paywall-badge {
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.2s ease;
+    }
+    .paywall-badge:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
     .publication-badge svg, .authors-badge svg {
       width: 16px;
       height: 16px;
@@ -65,10 +74,93 @@ export const htmlTemplate = ({ styles, script }) => /*html*/ `
       color: #6d6d7d;
       text-transform: capitalize;
       font-size: 0.875rem;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.2s ease;
+      padding: 2px 4px;
+      border-radius: 4px;
+    }
+    .article-type:hover {
+      background: rgba(139, 92, 246, 0.1);
+      color: #8b5cf6;
+      transform: translateY(-1px);
     }
     .authors-list {
       color: #6d6d7d;
       font-size: 0.875rem;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.2s ease;
+      padding: 2px 4px;
+      border-radius: 4px;
+      min-width: 60px;
+      display: inline-block;
+    }
+    .authors-list:hover {
+      background: rgba(139, 92, 246, 0.1);
+      color: #8b5cf6;
+      transform: translateY(-1px);
+    }
+    .image-container {
+      position: relative;
+      display: inline-block;
+      width: 100%;
+    }
+    .remove-image-btn {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: rgba(0, 0, 0, 0.7);
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-size: 16px;
+      font-weight: bold;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+      z-index: 10;
+    }
+    .remove-image-btn:hover {
+      background: rgba(220, 38, 38, 0.8);
+      transform: scale(1.1);
+    }
+    .add-image-placeholder {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      height: 120px;
+      border: 2px dashed #3d3d47;
+      border-radius: 12px;
+      background: #1a1a1f;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      margin-top: 0.5rem;
+    }
+    .add-image-placeholder:hover {
+      border-color: #8b5cf6;
+      background: rgba(139, 92, 246, 0.05);
+    }
+    .add-icon {
+      font-size: 24px;
+      color: #6d6d7d;
+      margin-bottom: 4px;
+      transition: color 0.2s ease;
+    }
+    .add-text {
+      font-size: 14px;
+      color: #6d6d7d;
+      transition: color 0.2s ease;
+    }
+    .add-image-placeholder:hover .add-icon,
+    .add-image-placeholder:hover .add-text {
+      color: #8b5cf6;
     }
   </style>
 </head>
@@ -87,6 +179,15 @@ export const htmlTemplate = ({ styles, script }) => /*html*/ `
         <button id="copyAll" title="Press Ctrl+Q to activate">
           Copy All
           <span class="kbd-hint">⌃Q</span>
+        </button>
+        <button id="threadsButton" onclick="postToThreads()" title="Post to Threads" disabled style="display: none;">
+          🧵 Post to Threads
+        </button>
+        <button id="blueskyButton" onclick="postToBluesky()" title="Post to Bluesky" disabled>
+          🦋 Post to Bluesky
+        </button>
+        <button id="linkedinButton" onclick="postToLinkedIn()" title="Post to LinkedIn" disabled style="display: none;">
+          💼 Post to LinkedIn
         </button>
       </div>
       <div class="output-group">
@@ -108,7 +209,14 @@ export const htmlTemplate = ({ styles, script }) => /*html*/ `
         <textarea id="out"></textarea>
         <div class="label caption-label">Image Caption</div>
         <input type="text" id="caption" placeholder="Image caption will appear here..." />
+        <div class="image-container">
         <img id="preview" alt="Article preview" />
+          <button id="removeImage" class="remove-image-btn" title="Remove image">×</button>
+          <div id="addImagePlaceholder" class="add-image-placeholder" title="Click to add image from clipboard">
+            <span class="add-icon">+</span>
+            <span class="add-text">Add Image</span>
+          </div>
+        </div>
       </div>
     </div>
   </div>

@@ -23,10 +23,12 @@ export const PUBLICATION_NAMES = {
   // Other Canadian Publications
   "canadahealthwatch.ca": "Canada Healthwatch",
   "cbc.ca": "CBC News",
+  "cp24.com": "CP24",
   "globalnews.ca": "Global News",
   "theglobeandmail.com": "The Globe and Mail",
   "thestar.com": "Toronto Star",
   "ctvnews.ca": "CTV News",
+  "barrietoday.com": "Barrie Today",
   "healthydebate.ca": "Healthy Debate",
   "thetrillium.ca": "The Trillium",
   "cabinradio.ca": "Cabin Radio",
@@ -40,6 +42,9 @@ export const PUBLICATION_NAMES = {
   "canadianaffairs.news": "Canadian Affairs",
   "stcatharinesstandard.ca": "St Catherines Standard",
   "thespec.com": "The Hamilton Spectator",
+  "hilltimes.com": "The Hill Times",
+  "thewalrus.ca": "The Walrus",
+  "importantcontext.news": "Important Context",
 
   // International Publications
   "theguardian.com": "The Guardian",
@@ -57,6 +62,7 @@ export const PUBLICATION_NAMES = {
   "nbcnews.com": "NBC News",
   "arstechnica.com": "Ars Technica",
   "bloomberg.com": "Bloomberg",
+  "time.com": "TIME",
   
   // Medical/Health Publications
   "justanoldcountrydoctor.com": "justanoldcountrydoctor",
@@ -84,5 +90,10 @@ export const FREE_DOMAINS = [
   'cbc.ca',
   'globalnews.ca',
   'healthydebate.ca',
-  // ... other known free domains ...
+  'arstechnica.com',  // Never paywalled despite "subscribers only" text in HTML
+  'npr.org',
+  'reuters.com',
+  'ap.org',
+  'bbc.com',
+  'bbc.co.uk'
 ]; 

@@ -4,4 +4,16 @@ compatibility_date = "2025-05-08"
 
 # Enable observability
 [observability]
-enabled = true 
+enabled = true
+
+# Environment variables for Threads API
+[vars]
+THREADS_APP_ID = "1260867418730773"
+LINKEDIN_APP_ID = "223810124"
+
+# Secure credentials stored as Cloudflare secrets:
+# wrangler secret put THREADS_APP_SECRET
+# wrangler secret put BLUESKY_HANDLE
+# wrangler secret put BLUESKY_APP_PASSWORD 
+# wrangler secret put LINKEDIN_ACCESS_TOKEN
+# wrangler secret put LINKEDIN_PERSON_ID 

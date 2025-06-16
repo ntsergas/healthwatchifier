@@ -21,8 +21,12 @@ export function detectOpinionFromUrl(url) {
       '/perspectives/',
       '/perspective/',
       '/op-ed/',
+      '/op-ed-',
       '/editorial/',
-      '/commentary/'
+      '/editorial-',
+      '/commentary/',
+      '/commentary-',
+      '/commentisfree/'  // Guardian opinion articles
     ];
     
     // 🎯 HEALTHY DEBATE SPECIFIC: All /topic/ URLs but need to check content for actual type
@@ -56,6 +60,7 @@ export function detectOpinionFromTitle(title) {
   const titleLower = title.toLowerCase().trim();
   const opinionPrefixes = [
     'opinion:',
+    'op-ed:',
     'editorial:',
     'commentary:',
     'analysis:',

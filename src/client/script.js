@@ -8,6 +8,8 @@ export const clientScript = /*javascript*/ `
   const authorsList = authorsBadge.querySelector('.authors-list');
   const paywallBadge = $("paywall");
   const paywallStatus = paywallBadge.querySelector('.paywall-status');
+  const removeImageBtn = $("removeImage");
+  const addImagePlaceholder = $("addImagePlaceholder");
 
   // URL sanitization function
   function sanitizeUrl(input) {
@@ -33,6 +35,178 @@ export const clientScript = /*javascript*/ `
 
   // Show output group initially with 0 opacity
   outputGroup.style.display = 'block';
+
+  // Paywall badge toggle functionality
+  paywallBadge.addEventListener('click', () => {
+    if (paywallBadge.style.display === 'none') return; // Don't toggle if hidden
+    
+    const isCurrentlyPaywalled = paywallBadge.classList.contains('paywall-locked');
+    
+    // Toggle the state
+    if (isCurrentlyPaywalled) {
+      // Change to Free
+      paywallStatus.textContent = '✓ Free';
+      paywallBadge.classList.remove('paywall-locked');
+      paywallBadge.classList.add('paywall-free');
+    } else {
+      // Change to Paywalled
+      paywallStatus.textContent = '🔒 Paywalled';
+      paywallBadge.classList.remove('paywall-free');
+      paywallBadge.classList.add('paywall-locked');
+    }
+    
+    // Add a little bounce animation to show it was clicked
+    gsap.to(paywallBadge, {
+      scale: 1.1,
+      duration: 0.15,
+      ease: "power2.out",
+      yoyo: true,
+      repeat: 1
+    });
+  });
+
+  // Article type toggle functionality (News vs Opinion)
+  articleType.addEventListener('click', () => {
+    if (publicationBadge.style.display === 'none') return; // Don't toggle if hidden
+    
+    const currentType = articleType.textContent.toLowerCase();
+    
+    // Toggle between news and opinion
+    if (currentType === 'news') {
+      articleType.textContent = 'opinion';
+    } else {
+      articleType.textContent = 'news';
+    }
+    
+    // Add a little bounce animation to show it was clicked
+    gsap.to(articleType, {
+      scale: 1.1,
+      duration: 0.15,
+      ease: "power2.out",
+      yoyo: true,
+      repeat: 1
+    });
+  });
+
+  // Authors text inline editing functionality
+  authorsList.addEventListener('click', () => {
+    if (authorsBadge.style.display === 'none') return; // Don't edit if hidden
+    
+    const currentText = authorsList.textContent;
+    
+    // Create an input element
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = currentText;
+    input.style.background = 'transparent';
+    input.style.border = 'none';
+    input.style.color = 'inherit';
+    input.style.font = 'inherit';
+    input.style.width = '100%';
+    input.style.outline = 'none';
+    input.style.padding = '0';
+    
+    // Replace the text with the input
+    authorsList.textContent = '';
+    authorsList.appendChild(input);
+    
+    // Focus and select all text
+    input.focus();
+    input.select();
+    
+    // Handle saving the edit
+    const saveEdit = () => {
+      const newText = input.value.trim() || currentText; // Fallback to original if empty
+      authorsList.textContent = newText;
+      
+      // Add a little bounce animation to show it was saved
+      gsap.to(authorsList, {
+        scale: 1.05,
+        duration: 0.15,
+        ease: "power2.out",
+        yoyo: true,
+        repeat: 1
+      });
+    };
+    
+    // Save on Enter or blur
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        saveEdit();
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        authorsList.textContent = currentText; // Revert to original
+      }
+    });
+    
+    input.addEventListener('blur', saveEdit);
+  });
+
+  // Image management functionality
+  removeImageBtn.addEventListener('click', () => {
+    const preview = $("preview");
+    preview.style.display = "none";
+    preview.src = "";
+    removeImageBtn.style.display = "none";
+    addImagePlaceholder.style.display = "flex";
+    
+    // Clear caption too
+    $("caption").value = "";
+    
+    // Add a little animation
+    gsap.to(addImagePlaceholder, {
+      opacity: 1,
+      scale: 1,
+      duration: 0.3,
+      ease: "back.out(1.4)"
+    });
+  });
+
+  addImagePlaceholder.addEventListener('click', async () => {
+    try {
+      // Try to read image from clipboard
+      const clipboardItems = await navigator.clipboard.read();
+      
+      for (const clipboardItem of clipboardItems) {
+        for (const type of clipboardItem.types) {
+          if (type.startsWith('image/')) {
+            const blob = await clipboardItem.getType(type);
+            const url = URL.createObjectURL(blob);
+            
+            const preview = $("preview");
+            preview.src = url;
+            preview.style.display = "block";
+            preview.style.opacity = 0;
+            preview.style.transform = "scale(0.95) translateY(10px)";
+            
+            // Hide placeholder, show remove button
+            addImagePlaceholder.style.display = "none";
+            removeImageBtn.style.display = "flex";
+            
+            // Animate image in
+            gsap.to(preview, {
+              opacity: 1,
+              scale: 1,
+              y: 0,
+              duration: 0.6,
+              ease: "back.out(1.4)"
+            });
+            
+            return; // Exit after first image found
+          }
+        }
+      }
+      
+      // No image found in clipboard
+      alert('No image found in clipboard. Copy an image first, then try again.');
+      
+    } catch (error) {
+      console.error('Failed to read clipboard:', error);
+      alert('Failed to read clipboard. Make sure you have copied an image and granted clipboard permissions.');
+    }
+  });
 
   // Handle URL paste event
   $("link").addEventListener('paste', (e) => {
@@ -158,6 +332,10 @@ export const clientScript = /*javascript*/ `
         $("preview").style.opacity = 0;
         $("preview").style.transform = "scale(0.95) translateY(10px)";
         
+        // Show remove button, hide add placeholder
+        removeImageBtn.style.display = "flex";
+        addImagePlaceholder.style.display = "none";
+        
         gsap.to($("preview"), {
           opacity: 1,
           scale: 1,
@@ -165,6 +343,11 @@ export const clientScript = /*javascript*/ `
           duration: 0.6,
           ease: "back.out(1.4)"
         });
+      } else {
+        // No image found, show add placeholder
+        $("preview").style.display = "none";
+        removeImageBtn.style.display = "none";
+        addImagePlaceholder.style.display = "flex";
       }
       $("out").style.opacity = 1;
       outputGroup.classList.add('visible');
@@ -363,6 +546,143 @@ export const clientScript = /*javascript*/ `
     }
   };
 
+
+  // Post to LinkedIn function
+  window.postToLinkedIn = async function() {
+    const output = $("out").value;
+    const imagePreview = $("preview");
+    const articleUrl = $("link").value;
+    
+    if (!output.trim()) {
+      alert('Please extract an article first');
+      return;
+    }
+
+    const button = $("linkedinButton");
+    const originalText = button.textContent;
+    button.disabled = true;
+    button.textContent = '💼 Posting...';
+
+    try {
+      const postData = {
+        text: output,
+        imageUrl: imagePreview.src && imagePreview.style.display !== 'none' ? imagePreview.src : null,
+        articleUrl: articleUrl || null
+      };
+
+      const response = await fetch('/api/linkedin-post', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(postData)
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        // Success animation
+        gsap.to(button, {
+          scale: 1.2,
+          duration: 0.3,
+          ease: "back.out(3)",
+          yoyo: true,
+          repeat: 1
+        });
+        button.textContent = '✅ Posted!';
+        
+        // Reset button after 3 seconds
+        setTimeout(() => {
+          button.textContent = originalText;
+          button.disabled = false;
+        }, 3000);
+      } else {
+        throw new Error(result.error || 'Failed to post');
+      }
+
+    } catch (error) {
+      console.error('❌ Failed to post to LinkedIn:', error);
+      button.textContent = "❌ Failed";
+      
+      // Error animation
+      gsap.to(button, {
+        x: [-5, 5, -5, 5, 0],
+        duration: 0.5,
+        ease: "power1.inOut"
+      });
+      
+      // Reset button after 3 seconds
+      setTimeout(() => {
+        button.textContent = originalText;
+        button.disabled = false;
+      }, 3000);
+    }
+  };
+
+  // Post to Bluesky function
+  window.postToBluesky = async function() {
+    const output = $("out").value;
+    const caption = $("caption").value;
+    const img = $("preview");
+    
+    if (!output) {
+      alert('Please generate content first by entering a URL and clicking "Healthwatch-ify"');
+      return;
+    }
+    
+    const blueskyButton = $("blueskyButton");
+    const originalText = blueskyButton.textContent;
+    
+    try {
+      blueskyButton.textContent = "Posting to Bluesky...";
+      blueskyButton.disabled = true;
+      
+      // Prepare post data (credentials now handled server-side)
+      const postData = {
+        text: output,
+        altText: caption || 'Health news article image'
+      };
+      
+      // Include image if available
+      if (img.src && img.style.display !== "none") {
+        postData.imageUrl = img.src;
+      }
+      
+      const response = await fetch('/api/bluesky-post', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(postData)
+      });
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        blueskyButton.textContent = "✅ Posted!";
+        
+        // Reset button after 3 seconds
+        setTimeout(() => {
+          blueskyButton.textContent = originalText;
+          blueskyButton.disabled = false;
+        }, 3000);
+      } else {
+        throw new Error(result.error || 'Unknown error occurred');
+      }
+      
+    } catch (error) {
+      console.error('Bluesky posting error:', error);
+      blueskyButton.textContent = "❌ Failed";
+      alert('Failed to post to Bluesky: ' + error.message);
+      
+      // Reset button after 3 seconds
+      setTimeout(() => {
+        blueskyButton.textContent = originalText;
+        blueskyButton.disabled = false;
+      }, 3000);
+    }
+  };
+
   // 🎹 KEYBOARD SHORTCUTS
   document.addEventListener('keydown', (e) => {
     // Enter key: Trigger Healthwatchify (but not when typing in input)
@@ -400,6 +720,10 @@ export const clientScript = /*javascript*/ `
     paywallBadge.classList.remove('visible');
     paywallBadge.classList.remove('paywall-free');
     paywallBadge.classList.remove('paywall-locked');
+    
+    // Reset image controls
+    removeImageBtn.style.display = 'none';
+    addImagePlaceholder.style.display = 'none';
   }
 
   // Update UI with response data
@@ -418,4 +742,117 @@ export const clientScript = /*javascript*/ `
 
     // ... existing code ...
   }
+
+  // 🧵 THREADS FUNCTIONALITY
+
+  // Make postToThreads globally available
+  window.postToThreads = async function() {
+    const title = $("title").value;
+    const imagePreview = $("preview");
+    const caption = $("caption").value;
+    
+    if (!title.trim()) {
+      alert('Please extract an article first');
+      return;
+    }
+
+    const button = $("threadsButton");
+    const originalText = button.textContent;
+    button.disabled = true;
+    button.textContent = '🧵 Posting...';
+
+    try {
+      const postData = {
+        headline: title,
+        imageUrl: imagePreview.src && imagePreview.style.display !== 'none' ? imagePreview.src : null,
+        caption: caption || ''
+      };
+
+      const response = await fetch('/api/threads-post', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(postData)
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        // Success animation
+        gsap.to(button, {
+          scale: 1.2,
+          duration: 0.3,
+          ease: "back.out(3)",
+          yoyo: true,
+          repeat: 1
+        });
+        button.textContent = '✅ Posted!';
+        
+        // Reset button after 3 seconds
+        setTimeout(() => {
+          button.textContent = originalText;
+          button.disabled = false;
+        }, 3000);
+      } else {
+        throw new Error(result.error || 'Failed to post');
+      }
+
+    } catch (error) {
+      console.error('❌ Failed to post to Threads:', error);
+      button.textContent = "❌ Failed";
+      
+      // Error animation
+      gsap.to(button, {
+        x: [-5, 5, -5, 5, 0],
+        duration: 0.5,
+        ease: "power1.inOut"
+      });
+      
+      // Reset button after 3 seconds
+      setTimeout(() => {
+        button.textContent = originalText;
+        button.disabled = false;
+      }, 3000);
+    }
+  };
+
+  // Enable Threads button when content is loaded
+  function enableThreadsButton() {
+    const button = $("threadsButton");
+    if (button && $("title").value.trim()) {
+      button.disabled = false;
+    }
+  }
+
+  // Enable Bluesky button when content is loaded
+  function enableBlueskyButton() {
+    const button = $("blueskyButton");
+    if (button && $("out").value.trim()) {
+      button.disabled = false;
+    }
+  }
+
+  // Enable buttons after successful extraction
+  const originalOnclick = $("go").onclick;
+  $("go").onclick = async function() {
+    await originalOnclick.call(this);
+    // Enable Threads button when content is loaded
+    const threadsButton = $("threadsButton");
+    if (threadsButton && $("title").value.trim()) {
+      threadsButton.disabled = false;
+    }
+    
+    // Enable Bluesky button when content is loaded
+    const blueskyButton = $("blueskyButton");
+    if (blueskyButton && $("out").value.trim()) {
+      blueskyButton.disabled = false;
+    }
+    
+    // LinkedIn button temporarily hidden while waiting for API permissions
+    /* const linkedinButton = $("linkedinButton");
+    if (linkedinButton && $("out").value.trim()) {
+      linkedinButton.disabled = false;
+    } */
+  };
 `; 

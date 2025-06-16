@@ -1,5 +1,13 @@
 import { handleHealthwatchify } from './api/healthwatchify.js';
+import threadsPost from './api/threads-post.js';
+import blueskyPost from './api/bluesky-post.js';
+import linkedinPost from './api/linkedin-post.js';
+import linkedinProfile from './api/linkedin-profile.js';
+import linkedinTest from './api/linkedin-test.js';
+import linkedinWhoami from './api/linkedin-whoami.js';
 import { htmlTemplate } from './templates/html.js';
+import { privacyTemplate } from './templates/privacy.js';
+import { dataDeletionTemplate } from './templates/data-deletion.js';
 import { styles } from './styles/styles.js';
 import { clientScript } from './client/script.js';
 import { htmlResponse } from './utils/response.js';
@@ -11,6 +19,50 @@ export default {
     // Handle API requests
     if (url.pathname === '/api/healthwatchify') {
       return handleHealthwatchify(request);
+    }
+
+    // Handle Threads posting
+    if (url.pathname === '/api/threads-post') {
+      return threadsPost.fetch(request, env, ctx);
+    }
+
+    // Handle Bluesky posting
+    if (url.pathname === '/api/bluesky-post') {
+      return blueskyPost.fetch(request, env, ctx);
+    }
+
+    // Handle LinkedIn posting
+    if (url.pathname === '/api/linkedin-post') {
+      return linkedinPost.fetch(request, env, ctx);
+    }
+
+    // Handle LinkedIn profile (temporary utility)
+    if (url.pathname === '/api/linkedin-profile') {
+      return linkedinProfile.fetch(request, env, ctx);
+    }
+
+    // Handle LinkedIn test (temporary utility)
+    if (url.pathname === '/api/linkedin-test') {
+      return linkedinTest.fetch(request, env, ctx);
+    }
+
+    // Handle LinkedIn whoami (temporary utility)
+    if (url.pathname === '/api/linkedin-whoami') {
+      return linkedinWhoami.fetch(request, env, ctx);
+    }
+
+    // Handle privacy policy
+    if (url.pathname === '/privacy') {
+      return new Response(privacyTemplate(), {
+        headers: { 'Content-Type': 'text/html' }
+      });
+    }
+
+    // Handle data deletion instructions
+    if (url.pathname === '/data-deletion') {
+      return new Response(dataDeletionTemplate(), {
+        headers: { 'Content-Type': 'text/html' }
+      });
     }
 
     // Handle image proxy requests

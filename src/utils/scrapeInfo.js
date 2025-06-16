@@ -1,6 +1,6 @@
 // import puppeteer from '@cloudflare/puppeteer';
 
-import { PUBLICATION_NAMES, PAYWALLED_DOMAINS } from './constants.js';
+import { PUBLICATION_NAMES, PAYWALLED_DOMAINS, FREE_DOMAINS } from './constants.js';
 import { detectOpinionFromUrl, detectOpinionFromTitle } from './articleTypeDetection.js';
 import { detectAuthorFromHtml } from './authorDetection.js';
 import { logger } from './logger.js';
@@ -94,22 +94,26 @@ function cleanupHeadline(headline, host) {
   headlineLogger.debug("After whitespace cleanup", { headline });
 
   // Remove site-specific suffixes
-  headline = headline.replace(/\s*\|\s*(CBC News|CBC Radio|CBC|Globalnews\.ca|CTV News|Toronto Star|The Globe and Mail|National Post|National|Vancouver Sun|Edmonton Journal|Montreal Gazette|The Trillium|Canada Healthwatch|The Tyee|Cancer|The Guardian|Global development|Canada)\s*$/i, "");
+  headline = headline.replace(/\s*\|\s*(CBC News|CBC Radio|CBC|Globalnews\.ca|CTV News|Toronto Star|The Globe and Mail|National Post|National|Vancouver Sun|Edmonton Journal|Montreal Gazette|The Trillium|Canada Healthwatch|The Tyee|Cancer|The Guardian|Global development|Canada|STAT|TikTok|The Walrus|Devi Sridhar|CIDRAP|Health|TIME)\s*$/i, "");
   headlineLogger.debug("After suffix removal", { headline });
 
   // Remove Canadian Press specific suffixes (e.g., " | BC | thecanadianpressnews.ca", " | Health News | thecanadianpressnews.ca")
   headline = headline.replace(/\s*\|\s*[A-Z][A-Za-z\s]*\s*\|\s*thecanadianpressnews\.ca\s*$/i, "");
   headlineLogger.debug("After Canadian Press suffix removal", { headline });
 
-  headline = headline.replace(/\s+-\s+(National|Healthy Debate|The Globe and Mail|Canada Healthwatch|CANADIAN AFFAIRS)\s*$/i, "");
+  headline = headline.replace(/\s+-\s+(National|Healthy Debate|The Globe and Mail|Canada Healthwatch|CANADIAN AFFAIRS|The Hill Times|Mother Jones|Brighter World|Barrie News)\s*$/i, "");
   headlineLogger.debug("After dash suffix removal", { headline });
 
   // Remove NPR-specific suffix
   headline = headline.replace(/\s*:\s*Shots\s*-\s*Health\s+News\s*:\s*NPR\s*$/i, "");
   headlineLogger.debug("After NPR suffix removal", { headline });
 
+  // Remove HTML entity dash suffixes (e.g., "&#x2d; Ars Technica")
+  headline = headline.replace(/\s*&#x2d;\s*Ars Technica\s*$/i, "");
+  headlineLogger.debug("After HTML entity dash suffix removal", { headline });
+
   // Remove common prefixes
-  headline = headline.replace(/^(WATCH|LISTEN|READ|EXCLUSIVE|UPDATE|OPINION):\s+/i, "");
+  headline = headline.replace(/^(WATCH|LISTEN|READ|EXCLUSIVE|UPDATE|OPINION|OP-ED|Analysis):\s+/i, "");
   headlineLogger.debug("After prefix removal", { headline });
 
   // Fix common encoding issues
@@ -250,6 +254,16 @@ function extractContentImage(html, url) {
 
     if (host === 'cabinradio.ca') {
       // Cabin Radio: Social previews are more reliable than content parsing
+      return null; // Let it fall back to social preview extraction
+    }
+
+    if (host === 'npr.org') {
+      // NPR: Social previews are more reliable than content parsing
+      return null; // Let it fall back to social preview extraction
+    }
+
+    if (host === 'ctvnews.ca') {
+      // CTV News: Social previews are more reliable than content parsing
       return null; // Let it fall back to social preview extraction
     }
     
@@ -753,7 +767,13 @@ function isPaywalled(url, html, pick) {
   try {
     const host = new URL(url).hostname.replace(/^www\./, '');
     
-    // 1. Check Globe and Mail (always paywalled)
+    // 0. Check FREE_DOMAINS first (never paywalled)
+    if (FREE_DOMAINS.some(domain => host.endsWith(domain))) {
+      paywallLogger.debug('Domain-based free content detection', { host });
+      return false;
+    }
+    
+    // 1. Check PAYWALLED_DOMAINS (always paywalled)
     if (PAYWALLED_DOMAINS.some(domain => host.endsWith(domain))) {
       paywallLogger.debug('Domain-based paywall detection', { host });
       return true;
