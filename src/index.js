@@ -5,6 +5,7 @@ import linkedinPost from './api/linkedin-post.js';
 import linkedinProfile from './api/linkedin-profile.js';
 import linkedinTest from './api/linkedin-test.js';
 import linkedinWhoami from './api/linkedin-whoami.js';
+import mastodonPost from './api/mastodon-post.js';
 import { htmlTemplate } from './templates/html.js';
 import { privacyTemplate } from './templates/privacy.js';
 import { dataDeletionTemplate } from './templates/data-deletion.js';
@@ -49,6 +50,11 @@ export default {
     // Handle LinkedIn whoami (temporary utility)
     if (url.pathname === '/api/linkedin-whoami') {
       return linkedinWhoami.fetch(request, env, ctx);
+    }
+
+    // Handle Mastodon posting
+    if (url.pathname === '/api/mastodon-post') {
+      return mastodonPost.fetch(request, env, ctx);
     }
 
     // Handle privacy policy

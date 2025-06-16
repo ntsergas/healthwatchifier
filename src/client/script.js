@@ -36,6 +36,29 @@ export const clientScript = /*javascript*/ `
   // Show output group initially with 0 opacity
   outputGroup.style.display = 'block';
 
+  // Show Mastodon button since credentials are configured
+  const mastodonButton = $("mastodonButton");
+  if (mastodonButton) {
+    mastodonButton.style.display = 'block';
+  }
+
+  // Function to update social buttons state
+  function updateSocialButtonsState() {
+    const hasContent = $("out").value.trim().length > 0;
+    const blueskyButton = $("blueskyButton");
+    const mastodonButton = $("mastodonButton");
+    
+    if (blueskyButton) {
+      blueskyButton.disabled = !hasContent;
+    }
+    if (mastodonButton) {
+      mastodonButton.disabled = !hasContent;
+    }
+  }
+
+  // Add listener to output field to update button states
+  $("out").addEventListener('input', updateSocialButtonsState);
+
   // Paywall badge toggle functionality
   paywallBadge.addEventListener('click', () => {
     if (paywallBadge.style.display === 'none') return; // Don't toggle if hidden
@@ -219,6 +242,63 @@ export const clientScript = /*javascript*/ `
     }, 0);
   });
 
+  async function postToMastodon() {
+    const button = $("mastodonButton");
+    const rawText = $("out").value;
+    const imageElement = $("preview");
+    const hasImage = imageElement && imageElement.style.display !== "none" && imageElement.src;
+    
+    // Transform CanadaHealthwatch.ca into a clickable link only for Mastodon
+    const transformedText = rawText.replace(
+      /CanadaHealthwatch\.ca/g,
+      'https://canadahealthwatch.ca'
+    );
+    
+    // Log the transformation for debugging
+    console.log('Original text:', JSON.stringify(rawText));
+    console.log('Transformed text:', JSON.stringify(transformedText));
+    
+    // Disable button and show loading state
+    button.disabled = true;
+    const originalText = button.textContent;
+    button.textContent = "Posting...";
+    
+    try {
+      const response = await fetch("/api/mastodon-post", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: transformedText,
+          imageUrl: hasImage ? imageElement.src : null,
+          altText: hasImage ? $("caption").value : null
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error('HTTP error! status: ' + response.status);
+      }
+      
+      // Show success state
+      button.textContent = "✓ Posted!";
+      button.style.background = "#22c55e";
+      
+      // Reset after 2 seconds
+      setTimeout(() => {
+        button.disabled = false;
+        button.textContent = originalText;
+        button.style.background = "";
+      }, 2000);
+      
+    } catch (error) {
+      console.error("Failed to post to Mastodon:", error);
+      alert("Failed to post to Mastodon. Please try again.");
+      
+      // Reset button
+      button.disabled = false;
+      button.textContent = originalText;
+    }
+  }
+
   $("go").onclick = async () => {
     let url = $("link").value.trim();
     if (!url) return alert("Please paste a URL first!");
@@ -351,6 +431,9 @@ export const clientScript = /*javascript*/ `
       }
       $("out").style.opacity = 1;
       outputGroup.classList.add('visible');
+
+      // Update social buttons state after content is loaded
+      updateSocialButtonsState();
 
     } catch (e) {
       // Stop ring animation
@@ -548,76 +631,9 @@ export const clientScript = /*javascript*/ `
 
 
   // Post to LinkedIn function
-  window.postToLinkedIn = async function() {
-    const output = $("out").value;
-    const imagePreview = $("preview");
-    const articleUrl = $("link").value;
-    
-    if (!output.trim()) {
-      alert('Please extract an article first');
-      return;
-    }
-
-    const button = $("linkedinButton");
-    const originalText = button.textContent;
-    button.disabled = true;
-    button.textContent = '💼 Posting...';
-
-    try {
-      const postData = {
-        text: output,
-        imageUrl: imagePreview.src && imagePreview.style.display !== 'none' ? imagePreview.src : null,
-        articleUrl: articleUrl || null
-      };
-
-      const response = await fetch('/api/linkedin-post', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(postData)
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        // Success animation
-        gsap.to(button, {
-          scale: 1.2,
-          duration: 0.3,
-          ease: "back.out(3)",
-          yoyo: true,
-          repeat: 1
-        });
-        button.textContent = '✅ Posted!';
-        
-        // Reset button after 3 seconds
-        setTimeout(() => {
-          button.textContent = originalText;
-          button.disabled = false;
-        }, 3000);
-      } else {
-        throw new Error(result.error || 'Failed to post');
-      }
-
-    } catch (error) {
-      console.error('❌ Failed to post to LinkedIn:', error);
-      button.textContent = "❌ Failed";
-      
-      // Error animation
-      gsap.to(button, {
-        x: [-5, 5, -5, 5, 0],
-        duration: 0.5,
-        ease: "power1.inOut"
-      });
-      
-      // Reset button after 3 seconds
-      setTimeout(() => {
-        button.textContent = originalText;
-        button.disabled = false;
-      }, 3000);
-    }
-  };
+  async function postToLinkedIn() {
+    await postToSocialMedia('linkedin-post', 'LinkedIn');
+  }
 
   // Post to Bluesky function
   window.postToBluesky = async function() {
@@ -853,6 +869,27 @@ export const clientScript = /*javascript*/ `
     /* const linkedinButton = $("linkedinButton");
     if (linkedinButton && $("out").value.trim()) {
       linkedinButton.disabled = false;
+    } */
+  };
+
+  // Enable buttons when content is loaded
+  window.onload = () => {
+    // Enable Bluesky button when content is loaded
+    const blueskyButton = $("blueskyButton");
+    if (blueskyButton && $("out").value.trim()) {
+      blueskyButton.disabled = false;
+    }
+    
+    // LinkedIn button temporarily hidden while waiting for API permissions
+    /* const linkedinButton = $("linkedinButton");
+    if (linkedinButton && $("out").value.trim()) {
+      linkedinButton.disabled = false;
+    } */
+
+    // Mastodon button temporarily hidden while waiting for API permissions
+    /* const mastodonButton = $("mastodonButton");
+    if (mastodonButton && $("out").value.trim()) {
+      mastodonButton.disabled = false;
     } */
   };
 `; 

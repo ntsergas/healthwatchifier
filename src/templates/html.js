@@ -13,6 +13,76 @@ export const htmlTemplate = ({ styles, script }) => /*html*/ `
   <script src="https://unpkg.com/lucide@latest"></script>
   <style>
     ${styles}
+    .button-group {
+      display: flex;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+      gap: 0;
+      position: relative;
+      z-index: 10; /* Ensure buttons stay above other content */
+    }
+
+    /* Primary buttons container */
+    .button-group .primary-buttons {
+      display: flex;
+      gap: 18px;
+      margin-right: 37px;
+    }
+    
+    /* Social buttons container */
+    .button-group .social-buttons {
+      display: flex;
+      gap: 0.75rem;
+    }
+    
+    .button-group button {
+      border-radius: 12px;
+      transition: all 0.2s ease;
+    }
+    
+    /* Primary action buttons (Healthwatch-ify and Copy All) */
+    .button-group button:not([id$="Button"]) {
+      background: #8b5cf6;
+      color: white;
+      border: none;
+      font-weight: 500;
+      padding: 1.25rem 1.0rem; /* Increased vertical padding */
+      min-width: 103px;
+      height: 90px; /* Taller, but not quite square */
+    }
+    
+    .button-group button:not([id$="Button"]):hover {
+      background: #7c3aed;
+      transform: translateY(-6px);
+    }
+    
+    /* Social posting buttons */
+    .button-group button[id$="Button"] {
+      border-radius: 999px;
+      padding: 0.875rem 1.25rem;
+      min-width: 105px;
+      height: 61px; /* Slightly taller */
+      font-size: 0.9275rem;
+      background: rgba(139, 92, 246, 0.15);
+      border: 1px solid rgba(139, 92, 246, 0.2);
+      color: #8b5cf6;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.6rem;
+    }
+    
+    .button-group button[id$="Button"]:hover:not(:disabled) {
+      background: rgba(139, 92, 246, 0.2);
+      border-color: rgba(139, 92, 246, 0.3);
+      transform: translateY(-6px);
+    }
+    
+    .button-group button[id$="Button"]:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
     .badge-container {
       display: flex;
       gap: 0.75rem;
@@ -105,6 +175,7 @@ export const htmlTemplate = ({ styles, script }) => /*html*/ `
       position: relative;
       display: inline-block;
       width: 100%;
+      z-index: 1; /* Keep images below the buttons */
     }
     .remove-image-btn {
       position: absolute;
@@ -123,7 +194,7 @@ export const htmlTemplate = ({ styles, script }) => /*html*/ `
       align-items: center;
       justify-content: center;
       transition: all 0.2s ease;
-      z-index: 10;
+      z-index: 20;
     }
     .remove-image-btn:hover {
       background: rgba(220, 38, 38, 0.8);
@@ -162,6 +233,24 @@ export const htmlTemplate = ({ styles, script }) => /*html*/ `
     .add-image-placeholder:hover .add-text {
       color: #8b5cf6;
     }
+    /* Add responsive adjustments for mobile */
+    @media (max-width: 768px) {
+      .button-group {
+        margin-bottom: 1.5rem; /* Add more space below buttons on mobile */
+      }
+
+      .button-group .primary-buttons,
+      .button-group .social-buttons {
+        flex-wrap: nowrap; /* Prevent button wrapping on mobile */
+        overflow-x: auto; /* Allow horizontal scrolling if needed */
+        -webkit-overflow-scrolling: touch;
+        padding-bottom: 0.5rem; /* Add space for potential scroll bar */
+      }
+
+      .button-group .primary-buttons {
+        margin-bottom: 1rem; /* Space between primary and social buttons on mobile */
+      }
+    }
   </style>
 </head>
 <body>
@@ -172,23 +261,30 @@ export const htmlTemplate = ({ styles, script }) => /*html*/ `
         <input type="url" id="link" placeholder="Paste a news article URL here..." />
       </div>
       <div class="button-group">
-        <button id="go" title="Press Enter to activate">
-          Healthwatch-ify
-          <span class="kbd-hint">↵</span>
-        </button>
-        <button id="copyAll" title="Press Ctrl+Q to activate">
-          Copy All
-          <span class="kbd-hint">⌃Q</span>
-        </button>
-        <button id="threadsButton" onclick="postToThreads()" title="Post to Threads" disabled style="display: none;">
-          🧵 Post to Threads
-        </button>
-        <button id="blueskyButton" onclick="postToBluesky()" title="Post to Bluesky" disabled>
-          🦋 Post to Bluesky
-        </button>
-        <button id="linkedinButton" onclick="postToLinkedIn()" title="Post to LinkedIn" disabled style="display: none;">
-          💼 Post to LinkedIn
-        </button>
+        <div class="primary-buttons">
+          <button id="go" title="Press Enter to activate">
+            Healthwatch-ify
+            <span class="kbd-hint">↵</span>
+          </button>
+          <button id="copyAll" title="Press Ctrl+Q to activate">
+            Copy All
+            <span class="kbd-hint">⌃Q</span>
+          </button>
+        </div>
+        <div class="social-buttons">
+          <button id="threadsButton" onclick="postToThreads()" title="Post to Threads" disabled style="display: none;">
+            🧵 Post to Threads
+          </button>
+          <button id="blueskyButton" onclick="postToBluesky()" title="Post to Bluesky" disabled>
+            🦋 Post to Bluesky
+          </button>
+          <button id="linkedinButton" onclick="postToLinkedIn()" title="Post to LinkedIn" disabled style="display: none;">
+            💼 Post to LinkedIn
+          </button>
+          <button id="mastodonButton" onclick="postToMastodon()" title="Post to Mastodon" disabled>
+            🐘 Post to Mastodon
+          </button>
+        </div>
       </div>
       <div class="output-group">
         <div class="badge-container">
