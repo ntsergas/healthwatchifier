@@ -93,15 +93,18 @@ function cleanupHeadline(headline, host) {
   headline = headline.replace(/\s+/g, " ").trim();
   headlineLogger.debug("After whitespace cleanup", { headline });
 
-  // Remove site-specific suffixes
-  headline = headline.replace(/\s*\|\s*(CBC News|CBC Radio|CBC|Globalnews\.ca|CTV News|Toronto Star|The Globe and Mail|National Post|National|Vancouver Sun|Edmonton Journal|Montreal Gazette|The Trillium|Canada Healthwatch|The Tyee|Cancer|The Guardian|Global development|Canada|STAT|TikTok|The Walrus|Devi Sridhar|CIDRAP|Health|TIME)\s*$/i, "");
-  headlineLogger.debug("After suffix removal", { headline });
-
-  // Remove Canadian Press specific suffixes (e.g., " | BC | thecanadianpressnews.ca", " | Health News | thecanadianpressnews.ca")
-  headline = headline.replace(/\s*\|\s*[A-Z][A-Za-z\s]*\s*\|\s*thecanadianpressnews\.ca\s*$/i, "");
-  headlineLogger.debug("After Canadian Press suffix removal", { headline });
+  // Remove everything after pipe character (including the space before it)
+  const pipeIndex = headline.indexOf('|');
+  if (pipeIndex !== -1) {
+    headline = headline.substring(0, pipeIndex).trim();
+  }
+  headlineLogger.debug("After pipe removal", { headline });
 
   headline = headline.replace(/\s+-\s+(National|Healthy Debate|The Globe and Mail|Canada Healthwatch|CANADIAN AFFAIRS|The Hill Times|Mother Jones|Brighter World|Barrie News)\s*$/i, "");
+  
+  // Remove em-dash suffixes (– and -) 
+  headline = headline.replace(/\s*–\s*(Winnipeg Free Press|The Independent)\s*$/i, "");
+  headline = headline.replace(/\s*-\s*(The Hub|19)\s*$/i, "");
   headlineLogger.debug("After dash suffix removal", { headline });
 
   // Remove NPR-specific suffix
@@ -406,6 +409,11 @@ function getPublicationName(url) {
     // Remove 'www.' prefix if present
     const host = hostname.replace(/^www\./, '');
     const domain = host.split('.').slice(-2).join('.');
+    
+    // Special case for CityNews subdomains (e.g. toronto.citynews.ca, vancouver.citynews.ca)
+    if (host.endsWith('.citynews.ca') || host === 'citynews.ca') {
+      return 'CityNews';
+    }
     
     // Check for exact domain match
     if (PUBLICATION_NAMES[host]) {

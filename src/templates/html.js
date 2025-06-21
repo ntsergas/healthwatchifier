@@ -86,7 +86,7 @@ export const htmlTemplate = ({ styles, script }) => /*html*/ `
     .badge-container {
       display: flex;
       gap: 0.75rem;
-      margin-bottom: 1rem;
+      margin-bottom: 1.5625rem;
       align-items: center;
     }
     .publication-badge, .authors-badge, .paywall-badge {
@@ -157,7 +157,7 @@ export const htmlTemplate = ({ styles, script }) => /*html*/ `
     }
     .authors-list {
       color: #6d6d7d;
-      font-size: 0.875rem;
+      font-size: 1rem;
       cursor: pointer;
       user-select: none;
       transition: all 0.2s ease;
@@ -167,6 +167,21 @@ export const htmlTemplate = ({ styles, script }) => /*html*/ `
       display: inline-block;
     }
     .authors-list:hover {
+      background: rgba(139, 92, 246, 0.1);
+      color: #8b5cf6;
+      transform: translateY(-1px);
+    }
+    .publication-name {
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.2s ease;
+      padding: 2px 4px;
+      border-radius: 4px;
+      min-width: 60px;
+      display: inline-block;
+      font-size: 1rem;
+    }
+    .publication-name:hover {
       background: rgba(139, 92, 246, 0.1);
       color: #8b5cf6;
       transform: translateY(-1px);

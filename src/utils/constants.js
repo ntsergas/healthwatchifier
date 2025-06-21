@@ -1,4 +1,4 @@
-export const TAGLINE = "𝗠𝗼𝗿𝗲 𝗵𝗲𝗮𝗹𝘁𝗵 𝗻𝗲𝘄𝘀 ⇢ CanadaHealthwatch.ca";
+export const TAGLINE = "𝗠𝗼𝗿𝗲 𝗻𝗲𝘄𝘀 ⇢ CanadaHealthwatch.ca 🍁";
 
 export const PUBLICATION_NAMES = {
   // Postmedia Publications
@@ -63,6 +63,9 @@ export const PUBLICATION_NAMES = {
   "arstechnica.com": "Ars Technica",
   "bloomberg.com": "Bloomberg",
   "time.com": "TIME",
+  "winnipegfreepress.com": "Winnipeg Free Press",
+  "thehub.ca": "The Hub",
+  "newscientist.com": "New Scientist",
   
   // Medical/Health Publications
   "justanoldcountrydoctor.com": "justanoldcountrydoctor",

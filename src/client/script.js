@@ -167,6 +167,62 @@ export const clientScript = /*javascript*/ `
     input.addEventListener('blur', saveEdit);
   });
 
+  // Publication name inline editing functionality
+  publicationName.addEventListener('click', () => {
+    if (publicationBadge.style.display === 'none') return; // Don't edit if hidden
+    
+    const currentText = publicationName.textContent;
+    
+    // Create an input element
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = currentText;
+    input.style.background = 'transparent';
+    input.style.border = 'none';
+    input.style.color = 'inherit';
+    input.style.font = 'inherit';
+    input.style.width = '100%';
+    input.style.outline = 'none';
+    input.style.padding = '0';
+    
+    // Replace the text with the input
+    publicationName.textContent = '';
+    publicationName.appendChild(input);
+    
+    // Focus and select all text
+    input.focus();
+    input.select();
+    
+    // Handle saving the edit
+    const saveEdit = () => {
+      const newText = input.value.trim() || currentText; // Fallback to original if empty
+      publicationName.textContent = newText;
+      
+      // Add a little bounce animation to show it was saved
+      gsap.to(publicationName, {
+        scale: 1.05,
+        duration: 0.15,
+        ease: "power2.out",
+        yoyo: true,
+        repeat: 1
+      });
+    };
+    
+    // Save on Enter or blur
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        saveEdit();
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        publicationName.textContent = currentText; // Revert to original
+      }
+    });
+    
+    input.addEventListener('blur', saveEdit);
+  });
+
   // Image management functionality
   removeImageBtn.addEventListener('click', () => {
     const preview = $("preview");
