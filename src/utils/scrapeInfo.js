@@ -48,7 +48,8 @@ export function sanitizeUrl(input) {
         u.searchParams.delete(key);
       }
     }
-    return u.href;
+    // Decode the URL to preserve special characters like é, ñ, etc.
+    return decodeURI(u.href);
   } catch {
     return input;
   }

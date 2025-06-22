@@ -13,25 +13,26 @@ export const clientScript = /*javascript*/ `
 
   // URL sanitization function
   function sanitizeUrl(input) {
-    try {
-      const u = new URL(input);
-      for (const key of Array.from(u.searchParams.keys())) {
-        const lower = key.toLowerCase();
-        if (
-          lower.startsWith("utm_") ||
-          lower === "cmp" ||
-          lower === "fbclid" ||
-          lower === "gclid" ||
-          lower.startsWith("mc_")
-        ) {
-          u.searchParams.delete(key);
-        }
+  try {
+    const u = new URL(input);
+    for (const key of Array.from(u.searchParams.keys())) {
+      const lower = key.toLowerCase();
+      if (
+        lower.startsWith("utm_") ||
+        lower === "cmp" ||
+        lower === "fbclid" ||
+        lower === "gclid" ||
+        lower.startsWith("mc_")
+      ) {
+        u.searchParams.delete(key);
       }
-      return u.href;
-    } catch {
-      return input;
     }
+    // Decode the URL to preserve special characters like é, ñ, etc.
+    return decodeURI(u.href);
+  } catch {
+    return input;
   }
+}
 
   // Show output group initially with 0 opacity
   outputGroup.style.display = 'block';
@@ -921,11 +922,144 @@ export const clientScript = /*javascript*/ `
       blueskyButton.disabled = false;
     }
     
+    // Enable Craft button when content is loaded
+    const craftButton = $("craftButton");
+    if (craftButton && $("title").value.trim()) {
+      craftButton.disabled = false;
+    }
+    
     // LinkedIn button temporarily hidden while waiting for API permissions
     /* const linkedinButton = $("linkedinButton");
     if (linkedinButton && $("out").value.trim()) {
       linkedinButton.disabled = false;
     } */
+  };
+
+  // 🌐 CRAFT CMS FUNCTIONALITY
+
+  // Make pushToCraft globally available
+  window.pushToCraft = async function() {
+    const title = $("title").value;
+    const link = $("link").value;
+    const imagePreview = $("preview");
+    
+    if (!title.trim() || !link.trim()) {
+      alert('Please extract an article first');
+      return;
+    }
+
+    // Show Craft options if not already visible
+    const craftOptions = $("craftOptions");
+      if (craftOptions.style.display === 'none') {
+    craftOptions.style.display = 'flex';
+      
+      // Animate the appearance
+      gsap.fromTo(craftOptions, 
+        { opacity: 0, y: 20 },
+        { opacity: 1, y: 0, duration: 0.3, ease: "power2.out" }
+      );
+      
+      // Change button text to indicate next step
+      const button = $("craftButton");
+      button.innerHTML = '🌐 Publish<br>Now';
+      return;
+    }
+
+    // Get selected topics and regions
+    const selectedTopics = Array.from(document.querySelectorAll('#topicsSelect input:checked')).map(cb => cb.value);
+    const selectedRegions = Array.from(document.querySelectorAll('#regionsSelect input:checked')).map(cb => cb.value);
+    
+    if (selectedTopics.length === 0 || selectedRegions.length === 0) {
+      alert('Please select at least one Topic and one Region before publishing.');
+      return;
+    }
+
+    const button = $("craftButton");
+    const originalText = button.textContent;
+    button.disabled = true;
+    button.textContent = '🌐 Publishing...';
+
+    try {
+      // Gather all the data
+      const postData = {
+        headline: title,
+        url: sanitizeUrl(link),
+        publication: publicationName.textContent,
+        articleType: articleType.textContent.toLowerCase(),
+        authors: authorsList.textContent ? [authorsList.textContent] : [],
+        isPaywalled: paywallBadge.classList.contains('paywall-locked'),
+        image: imagePreview.src && imagePreview.style.display !== 'none' ? imagePreview.src : null,
+        topics: selectedTopics,
+        regions: selectedRegions
+      };
+
+      const response = await fetch('/api/craft-post', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(postData)
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        // Success animation
+        gsap.to(button, {
+          scale: 1.2,
+          duration: 0.3,
+          ease: "back.out(3)",
+          yoyo: true,
+          repeat: 1
+        });
+        button.textContent = '✅ Published!';
+        
+        // Hide craft options after successful publish
+        gsap.to(craftOptions, {
+          opacity: 0,
+          y: -20,
+          duration: 0.3,
+          ease: "power2.in",
+          onComplete: () => {
+            craftOptions.style.display = 'none';
+          }
+        });
+        
+        // Show success message with link
+        if (result.url) {
+          setTimeout(() => {
+            alert(\`Article published successfully!\\n\\nView at: \${result.url}\`);
+          }, 500);
+        }
+        
+        // Reset button after 5 seconds
+        setTimeout(() => {
+          button.innerHTML = '🌐 Push<br>to Web';
+          button.disabled = false;
+        }, 5000);
+      } else {
+        throw new Error(result.error || 'Failed to publish');
+      }
+
+    } catch (error) {
+      console.error('❌ Failed to publish to Craft:', error);
+      button.textContent = "❌ Failed";
+      
+      // Error animation
+      gsap.to(button, {
+        x: [-5, 5, -5, 5, 0],
+        duration: 0.5,
+        ease: "power1.inOut"
+      });
+      
+      alert(\`Failed to publish: \${error.message}\`);
+      
+      // Reset button after 3 seconds
+      setTimeout(() => {
+        button.innerHTML = '🌐 Push<br>to Web';
+        button.disabled = false;
+      }, 3000);
+    }
   };
 
   // Enable buttons when content is loaded
@@ -934,6 +1068,12 @@ export const clientScript = /*javascript*/ `
     const blueskyButton = $("blueskyButton");
     if (blueskyButton && $("out").value.trim()) {
       blueskyButton.disabled = false;
+    }
+    
+    // Enable Craft button when content is loaded
+    const craftButton = $("craftButton");
+    if (craftButton && $("title").value.trim()) {
+      craftButton.disabled = false;
     }
     
     // LinkedIn button temporarily hidden while waiting for API permissions
@@ -947,5 +1087,15 @@ export const clientScript = /*javascript*/ `
     if (mastodonButton && $("out").value.trim()) {
       mastodonButton.disabled = false;
     } */
+  };
+
+  // Toggle all regions when "National" is clicked
+  window.toggleAllRegions = function(nationalCheckbox) {
+    const regionCheckboxes = document.querySelectorAll('.region-checkbox');
+    const isChecked = nationalCheckbox.checked;
+    
+    regionCheckboxes.forEach(checkbox => {
+      checkbox.checked = isChecked;
+    });
   };
 `; 

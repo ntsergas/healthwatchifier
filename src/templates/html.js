@@ -27,12 +27,14 @@ export const htmlTemplate = ({ styles, script }) => /*html*/ `
       display: flex;
       gap: 18px;
       margin-right: 37px;
+      align-items: center;
     }
     
     /* Social buttons container */
     .button-group .social-buttons {
       display: flex;
-      gap: 0.75rem;
+      gap: 1.5rem;
+      align-items: center;
     }
     
     .button-group button {
@@ -46,8 +48,8 @@ export const htmlTemplate = ({ styles, script }) => /*html*/ `
       color: white;
       border: none;
       font-weight: 500;
-      padding: 1.25rem 1.0rem; /* Increased vertical padding */
-      min-width: 103px;
+      padding: 1.25rem 0.75rem; /* Reduced horizontal padding */
+      min-width: 85px; /* Reduced from 98px */
       height: 90px; /* Taller, but not quite square */
     }
     
@@ -59,17 +61,19 @@ export const htmlTemplate = ({ styles, script }) => /*html*/ `
     /* Social posting buttons */
     .button-group button[id$="Button"] {
       border-radius: 999px;
-      padding: 0.875rem 1.25rem;
-      min-width: 105px;
+      padding: 0.875rem 0.75rem; /* A bit more horizontal padding */
+      max-width: 102px; /* Just a bit wider */
       height: 61px; /* Slightly taller */
-      font-size: 0.9275rem;
+      font-size: 0.9275rem; /* Back to original font size */
       background: rgba(139, 92, 246, 0.15);
       border: 1px solid rgba(139, 92, 246, 0.2);
       color: #8b5cf6;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 0.6rem;
+      gap: 0.5rem; /* Moderate gap */
+      white-space: normal; /* Allow text wrapping */
+      text-align: center;
     }
     
     .button-group button[id$="Button"]:hover:not(:disabled) {
@@ -83,10 +87,29 @@ export const htmlTemplate = ({ styles, script }) => /*html*/ `
       cursor: not-allowed;
     }
     
+    /* Special styling for Craft button - make it circular */
+    #craftButton {
+      border-radius: 50% !important;
+      width: 110px !important;
+      height: 110px !important;
+      min-width: 110px !important;
+      padding: 0.5rem !important;
+      font-size: 0.95rem !important;
+      line-height: 1.1 !important;
+      white-space: normal !important;
+      text-align: center !important;
+    }
+    
     .badge-container {
       display: flex;
-      gap: 0.75rem;
+      gap: 1rem;
       margin-bottom: 1.5625rem;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+    .main-badges {
+      display: flex;
+      gap: 0.75rem;
       align-items: center;
     }
     .publication-badge, .authors-badge, .paywall-badge {
@@ -248,8 +271,65 @@ export const htmlTemplate = ({ styles, script }) => /*html*/ `
     .add-image-placeholder:hover .add-text {
       color: #8b5cf6;
     }
+    /* Craft Publishing Options */
+    .craft-options {
+      display: flex;
+      gap: 0.5rem;
+      align-items: flex-start;
+      flex-wrap: nowrap;
+    }
+    .craft-field {
+      display: flex;
+      flex-direction: column;
+      width: 140px;
+      flex-shrink: 0;
+      flex-grow: 0;
+    }
+    .craft-field-label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #8b5cf6;
+      margin-bottom: 0.25rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .mini-select {
+      background: #2a2a2f;
+      border: 1px solid #3d3d47;
+      border-radius: 6px;
+      padding: 0.5rem;
+      max-height: 180px;
+      width: 100%;
+      overflow-y: auto;
+      box-sizing: border-box;
+    }
+    .mini-select-options {
+      display: flex;
+      flex-direction: column;
+      gap: 0.25rem;
+    }
+    .mini-select-options label {
+      display: flex;
+      align-items: center;
+      font-size: 0.75rem;
+      color: #e5e5e7;
+      cursor: pointer;
+      transition: color 0.2s ease;
+      white-space: nowrap;
+    }
+    .mini-select-options label:hover {
+      color: #8b5cf6;
+    }
+    .mini-select-options input[type="checkbox"] {
+      margin-right: 0.375rem;
+      accent-color: #8b5cf6;
+      transform: scale(0.9);
+      vertical-align: middle;
+      margin-top: 0;
+    }
+    
     /* Add responsive adjustments for mobile */
-    @media (max-width: 768px) {
+    @media (max-width: 480px) {
       .button-group {
         margin-bottom: 1.5rem; /* Add more space below buttons on mobile */
       }
@@ -264,6 +344,22 @@ export const htmlTemplate = ({ styles, script }) => /*html*/ `
 
       .button-group .primary-buttons {
         margin-bottom: 1rem; /* Space between primary and social buttons on mobile */
+      }
+      
+      .badge-container {
+        flex-wrap: wrap;
+      }
+      
+      .craft-options {
+        margin-left: 0;
+        margin-top: 0.5rem;
+        width: 100%;
+        flex-direction: column;
+        gap: 0.75rem;
+      }
+      
+      .craft-field {
+        width: 100%;
       }
     }
   </style>
@@ -299,19 +395,60 @@ export const htmlTemplate = ({ styles, script }) => /*html*/ `
           <button id="mastodonButton" onclick="postToMastodon()" title="Post to Mastodon" disabled>
             🐘 Post to Mastodon
           </button>
+          <button id="craftButton" onclick="pushToCraft()" title="Push to Web" disabled>
+            🌐 Push<br>to Web
+          </button>
         </div>
       </div>
       <div class="output-group">
         <div class="badge-container">
-          <div id="publication" class="publication-badge">
-            <span class="publication-name"></span>
-            <span class="article-type"></span>
+          <div class="main-badges">
+            <div id="publication" class="publication-badge">
+              <span class="publication-name"></span>
+              <span class="article-type"></span>
+            </div>
+            <div id="authors" class="authors-badge">
+              <span class="authors-list"></span>
+            </div>
+            <div id="paywall" class="paywall-badge">
+              <span class="paywall-status"></span>
+            </div>
           </div>
-          <div id="authors" class="authors-badge">
-            <span class="authors-list"></span>
-          </div>
-          <div id="paywall" class="paywall-badge">
-            <span class="paywall-status"></span>
+          
+          <!-- Craft Publishing Options -->
+          <div id="craftOptions" class="craft-options" style="display: none;">
+            <div class="craft-field">
+              <div class="craft-field-label">Topics</div>
+              <div class="mini-select" id="topicsSelect">
+                <div class="mini-select-options">
+                  <label><input type="checkbox" value="Canada"> Canada</label>
+                  <label><input type="checkbox" value="US"> US</label>
+                  <label><input type="checkbox" value="International"> International</label>
+                  <label><input type="checkbox" value="Technology"> Technology</label>
+                  <label><input type="checkbox" value="Policy"> Policy</label>
+                  <label><input type="checkbox" value="Opinion"> Opinion</label>
+                  <label><input type="checkbox" value="Research"> Research</label>
+                  <label><input type="checkbox" value="Pharma"> Pharma</label>
+                  <label><input type="checkbox" value="COVID"> COVID</label>
+                  <label><input type="checkbox" value="Business"> Business</label>
+                  <label><input type="checkbox" value="H5N1"> H5N1</label>
+                </div>
+              </div>
+            </div>
+            <div class="craft-field">
+              <div class="craft-field-label">Regions</div>
+              <div class="mini-select" id="regionsSelect">
+                <div class="mini-select-options">
+                  <label style="border-bottom: 1px solid #3d3d47; padding-bottom: 0.25rem; margin-bottom: 0.25rem; font-weight: 600;"><input type="checkbox" id="nationalRegion" onchange="toggleAllRegions(this)"> National</label>
+                  <label><input type="checkbox" value="Atlantic" class="region-checkbox"> Atlantic</label>
+                  <label><input type="checkbox" value="North" class="region-checkbox"> North</label>
+                  <label><input type="checkbox" value="Ontario" class="region-checkbox"> Ontario</label>
+                  <label><input type="checkbox" value="Prairies" class="region-checkbox"> Prairies</label>
+                  <label><input type="checkbox" value="Quebec" class="region-checkbox"> Quebec</label>
+                  <label><input type="checkbox" value="West" class="region-checkbox"> West</label>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
         <div class="label">Title</div>

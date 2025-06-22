@@ -16,4 +16,6 @@ LINKEDIN_APP_ID = "223810124"
 # wrangler secret put BLUESKY_HANDLE
 # wrangler secret put BLUESKY_APP_PASSWORD 
 # wrangler secret put LINKEDIN_ACCESS_TOKEN
-# wrangler secret put LINKEDIN_PERSON_ID 
+# wrangler secret put LINKEDIN_PERSON_ID
+# wrangler secret put CRAFT_BASE_URL
+# wrangler secret put CRAFT_API_TOKEN 
