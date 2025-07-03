@@ -108,6 +108,21 @@ export function extractImageCaption(html, url) {
       }
     }
     
+    // Ars Technica - descriptive caption is in div.caption-content before credit
+    if (host.includes('arstechnica.com')) {
+      // Prefer the nested caption inside the pswp-caption-content wrapper
+      let arsCaptionMatch = html.match(/<div[^>]*class=["'][^"']*pswp-caption-content[^"']*["'][^>]*>[\s\S]*?<div[^>]*class=["'][^"']*caption-content[^"']*["'][^>]*>([\s\S]*?)<\/div>/i);
+      if (!arsCaptionMatch) {
+        // Fallback: standalone caption-content div
+        arsCaptionMatch = html.match(/<div[^>]*class=["'][^"']*caption-content[^"']*["'][^>]*>([\s\S]*?)<\/div>/i);
+      }
+      if (arsCaptionMatch) {
+        // Strip any nested HTML tags
+        const raw = arsCaptionMatch[1].replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+        return cleanupImageCaption(raw);
+      }
+    }
+    
     // Generic fallback patterns for any other sites
     captionLogger.debug('Trying generic caption patterns');
     

@@ -271,20 +271,8 @@ export const htmlTemplate = ({ styles, script }) => /*html*/ `
     .add-image-placeholder:hover .add-text {
       color: #8b5cf6;
     }
-    /* Craft Publishing Options */
-    .craft-options {
-      display: flex;
-      gap: 0.5rem;
-      align-items: flex-start;
-      flex-wrap: nowrap;
-    }
-    .craft-field {
-      display: flex;
-      flex-direction: column;
-      width: 140px;
-      flex-shrink: 0;
-      flex-grow: 0;
-    }
+    
+    /* Craft Publishing Options - Visual Styling Only */
     .craft-field-label {
       font-size: 0.75rem;
       font-weight: 600;
@@ -349,18 +337,6 @@ export const htmlTemplate = ({ styles, script }) => /*html*/ `
       .badge-container {
         flex-wrap: wrap;
       }
-      
-      .craft-options {
-        margin-left: 0;
-        margin-top: 0.5rem;
-        width: 100%;
-        flex-direction: column;
-        gap: 0.75rem;
-      }
-      
-      .craft-field {
-        width: 100%;
-      }
     }
   </style>
 </head>
@@ -373,22 +349,22 @@ export const htmlTemplate = ({ styles, script }) => /*html*/ `
       </div>
       <div class="button-group">
         <div class="primary-buttons">
-          <button id="go" title="Press Enter to activate">
-            Healthwatch-ify
-            <span class="kbd-hint">↵</span>
-          </button>
-          <button id="copyAll" title="Press Ctrl+Q to activate">
-            Copy All
-            <span class="kbd-hint">⌃Q</span>
-          </button>
+        <button id="go" title="Press Enter to activate">
+          Healthwatch-ify
+          <span class="kbd-hint">↵</span>
+        </button>
+        <button id="copyAll" title="Press Ctrl+Q to activate">
+          Copy All
+          <span class="kbd-hint">⌃Q</span>
+        </button>
         </div>
         <div class="social-buttons">
           <button id="threadsButton" onclick="postToThreads()" title="Post to Threads" disabled style="display: none;">
-            🧵 Post to Threads
-          </button>
-          <button id="blueskyButton" onclick="postToBluesky()" title="Post to Bluesky" disabled>
-            🦋 Post to Bluesky
-          </button>
+          🧵 Post to Threads
+        </button>
+        <button id="blueskyButton" onclick="postToBluesky()" title="Post to Bluesky" disabled>
+          🦋 Post to Bluesky
+        </button>
           <button id="linkedinButton" onclick="postToLinkedIn()" title="Post to LinkedIn" disabled style="display: none;">
             💼 Post to LinkedIn
           </button>
@@ -407,6 +383,8 @@ export const htmlTemplate = ({ styles, script }) => /*html*/ `
               <span class="publication-name"></span>
               <span class="article-type"></span>
             </div>
+          </div>
+          <div class="secondary-badges">
             <div id="authors" class="authors-badge">
               <span class="authors-list"></span>
             </div>
@@ -417,21 +395,25 @@ export const htmlTemplate = ({ styles, script }) => /*html*/ `
           
           <!-- Craft Publishing Options -->
           <div id="craftOptions" class="craft-options" style="display: none;">
+            <button id="closeCraftOptions" title="Close"
+              style="position: absolute; top: 0.7rem; right: 0.9rem; background: none; border: none; color: #a78bfa; font-size: 1.1rem; cursor: pointer; z-index: 101; padding: 0.1em 0.3em; line-height: 1; box-shadow: none; outline: none; width: 1.6em; height: 1.6em; min-width: 0; min-height: 0; display: flex; align-items: center; justify-content: center;">
+              🔄
+            </button>
             <div class="craft-field">
               <div class="craft-field-label">Topics</div>
               <div class="mini-select" id="topicsSelect">
                 <div class="mini-select-options">
-                  <label><input type="checkbox" value="Canada"> Canada</label>
-                  <label><input type="checkbox" value="US"> US</label>
-                  <label><input type="checkbox" value="International"> International</label>
-                  <label><input type="checkbox" value="Technology"> Technology</label>
-                  <label><input type="checkbox" value="Policy"> Policy</label>
-                  <label><input type="checkbox" value="Opinion"> Opinion</label>
-                  <label><input type="checkbox" value="Research"> Research</label>
-                  <label><input type="checkbox" value="Pharma"> Pharma</label>
-                  <label><input type="checkbox" value="COVID"> COVID</label>
-                  <label><input type="checkbox" value="Business"> Business</label>
-                  <label><input type="checkbox" value="H5N1"> H5N1</label>
+                  <label><input type="checkbox" value="Canada" name="articleTopic"> Canada</label>
+                  <label><input type="checkbox" value="US" name="articleTopic"> US</label>
+                  <label><input type="checkbox" value="International" name="articleTopic"> International</label>
+                  <label><input type="checkbox" value="Technology" name="articleTopic"> Technology</label>
+                  <label><input type="checkbox" value="Policy" name="articleTopic"> Policy</label>
+                  <label><input type="checkbox" value="Opinion" name="articleTopic"> Opinion</label>
+                  <label><input type="checkbox" value="Research" name="articleTopic"> Research</label>
+                  <label><input type="checkbox" value="Pharma" name="articleTopic"> Pharma</label>
+                  <label><input type="checkbox" value="COVID" name="articleTopic"> COVID</label>
+                  <label><input type="checkbox" value="Business" name="articleTopic"> Business</label>
+                  <label><input type="checkbox" value="H5N1" name="articleTopic"> H5N1</label>
                 </div>
               </div>
             </div>
@@ -440,12 +422,12 @@ export const htmlTemplate = ({ styles, script }) => /*html*/ `
               <div class="mini-select" id="regionsSelect">
                 <div class="mini-select-options">
                   <label style="border-bottom: 1px solid #3d3d47; padding-bottom: 0.25rem; margin-bottom: 0.25rem; font-weight: 600;"><input type="checkbox" id="nationalRegion" onchange="toggleAllRegions(this)"> National</label>
-                  <label><input type="checkbox" value="Atlantic" class="region-checkbox"> Atlantic</label>
-                  <label><input type="checkbox" value="North" class="region-checkbox"> North</label>
-                  <label><input type="checkbox" value="Ontario" class="region-checkbox"> Ontario</label>
-                  <label><input type="checkbox" value="Prairies" class="region-checkbox"> Prairies</label>
-                  <label><input type="checkbox" value="Quebec" class="region-checkbox"> Quebec</label>
-                  <label><input type="checkbox" value="West" class="region-checkbox"> West</label>
+                  <label><input type="checkbox" value="ATLANTIC" class="region-checkbox" name="articleRegion"> Atlantic</label>
+                  <label><input type="checkbox" value="NORTH" class="region-checkbox" name="articleRegion"> North</label>
+                  <label><input type="checkbox" value="ONTARIO" class="region-checkbox" name="articleRegion"> Ontario</label>
+                  <label><input type="checkbox" value="PRAIRIES" class="region-checkbox" name="articleRegion"> Prairies</label>
+                  <label><input type="checkbox" value="QUEBEC" class="region-checkbox" name="articleRegion"> Quebec</label>
+                  <label><input type="checkbox" value="WEST" class="region-checkbox" name="articleRegion"> West</label>
                 </div>
               </div>
             </div>

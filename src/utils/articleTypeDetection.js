@@ -36,6 +36,18 @@ export function detectOpinionFromUrl(url) {
       urlLower.includes(pattern)
     );
     
+    // CBC.ca special case: 'first-person' in URL means Opinion
+    if (urlLower.includes('cbc.ca') && urlLower.includes('first-person')) {
+      detectionLogger.exit('detectOpinionFromUrl', { hasOpinionPattern: true, reason: 'cbc.ca first-person' });
+      return true;
+    }
+    
+    // CIDRAP special case: 'viewpoint-' in URL means Opinion
+    if (urlLower.includes('cidrap.umn.edu') && urlLower.includes('viewpoint-')) {
+      detectionLogger.exit('detectOpinionFromUrl', { hasOpinionPattern: true, reason: 'cidrap.umn.edu viewpoint-' });
+      return true;
+    }
+    
     detectionLogger.exit('detectOpinionFromUrl', { hasOpinionPattern });
     return hasOpinionPattern;
     

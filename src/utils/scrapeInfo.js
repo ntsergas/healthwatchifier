@@ -15,7 +15,7 @@ const decode = (s = "") =>
     .replace(/&quot;/g, '"')
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
-    .replace(/&#(\d+)(?:\s*;)?/g, (_, n) => String.fromCharCode(+n));
+    .replace(/&#(\d+)(?:\s*;)?/g, (_, n) => String.fromCodePoint(+n));
 
 const POSTMEDIA = [
   "nationalpost.com", "montrealgazette.com", "ottawacitizen.com",
@@ -103,9 +103,8 @@ function cleanupHeadline(headline, host) {
 
   headline = headline.replace(/\s+-\s+(National|Healthy Debate|The Globe and Mail|Canada Healthwatch|CANADIAN AFFAIRS|The Hill Times|Mother Jones|Brighter World|Barrie News)\s*$/i, "");
   
-  // Remove em-dash suffixes (– and -) 
-  headline = headline.replace(/\s*–\s*(Winnipeg Free Press|The Independent)\s*$/i, "");
-  headline = headline.replace(/\s*-\s*(The Hub|19)\s*$/i, "");
+  // Remove em-dash and dash suffixes for a wider set of publications
+  headline = headline.replace(/\s*[–-]\s*(Winnipeg Free Press|The Independent|POLITICO|justanoldcountrydoctor|Investigative Journalism Bureau|Okanagan|The Trillium|Victoria Times Colonist)\s*$/i, "");
   headlineLogger.debug("After dash suffix removal", { headline });
 
   // Remove NPR-specific suffix
@@ -288,6 +287,11 @@ function extractContentImage(html, url) {
       
       // Fallback to social preview only if no content image found
       return null; 
+    }
+    
+    if (host === 'thetrillium.ca') {
+      // The Trillium: Social previews are more reliable than content parsing (avoids author images)
+      return null; // Let it fall back to social preview extraction
     }
     
     // Find the h1 tag first
@@ -1293,6 +1297,38 @@ export async function scrapeInfo(url, cf = { cacheTtl: 300 }, depth = 0, visited
         articleType,
         html
       };
+    }
+  }
+
+  // Special case: prich5757.wordpress.com should always be Opinion by Pat Rich
+  if (host === 'prich5757.wordpress.com') {
+    return {
+      headline: cleanupHeadline(head, host),
+      image: img,
+      url,
+      publication,
+      articleType: 'opinion',
+      authors: ['Pat Rich'],
+      wasAssociatedPress: false,
+      isPaywalled: isPaywalled(url, html, pick),
+      html
+    };
+  }
+
+  // CBC.ca 'first-person' edge case: get headline from JSON-LD if present
+  if (isCBC && url.includes('first-person')) {
+    const jsonLdMatch = html.match(/<script[^>]*type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/i);
+    if (jsonLdMatch) {
+      try {
+        const cleaned = jsonLdMatch[1].replace(/[\x00-\x1F\x7F]/g, "");
+        const json = JSON.parse(cleaned);
+        const headline = json.headline?.trim() || json.name?.trim();
+        if (headline && headline.length > 10 && !/^first person$/i.test(headline)) {
+          head = headline;
+        }
+      } catch (e) {
+        logger.warn('Failed to parse JSON-LD for CBC first-person headline', { error: e.message });
+      }
     }
   }
 

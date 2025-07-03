@@ -72,10 +72,20 @@ export const PUBLICATION_NAMES = {
   "medicalxpress.com": "MedicalXpress.com",
   "cidrap.umn.edu": "CIDRAP",
   "kffhealthnews.org": "KFF Health News",
-  "statnews.com": "STAT"
+  "statnews.com": "STAT",
+
+  // Newly added publications
+  "checknews.ca": "Chek News",
+  "politico.com": "POLITICO",
+  "ijb.utoronto.ca": "Investigative Journalism Bureau",
+  "insauga.com": "InSauga",
+  "timescolonist.com": "Times Colonist",
+  "cmaj.ca": "CMAJ",
+  "prich5757.wordpress.com": "Days of Past Futures",
+  "hcamag.com": "Human Resources Director"
 };
 
-// Only domain we know is ALWAYS paywalled
+// Only domains we know are ALWAYS paywalled
 export const PAYWALLED_DOMAINS = [
   'theglobeandmail.com',
   'stcatharinesstandard.ca',
@@ -98,5 +108,6 @@ export const FREE_DOMAINS = [
   'reuters.com',
   'ap.org',
   'bbc.com',
-  'bbc.co.uk'
+  'bbc.co.uk',
+  'hcamag.com'
 ]; 

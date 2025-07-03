@@ -192,4 +192,135 @@ export const styles = /*css*/ `
   .label.caption-label {
     margin-top: 1.25rem;
   }
+
+  /* --- Craft Options Popout --- */
+  #craftOptions {
+    position: absolute;
+    top: 0rem;
+    right: 1.5rem;
+    width: 540px;
+    height: 220px;
+    padding: 20px 2px 2px 2px; /* top right bottom left */
+    border-width: 1px;
+    min-width: 400px;
+    max-width: 90vw;
+    min-height: 180px;
+    max-height: 90vh;
+    display: flex;
+    flex-direction: row;
+    gap: 1rem;
+    overflow: hidden;
+    transition: max-height 0.4s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s;
+    opacity: 0;
+    background: #232336;
+    border-radius: 10px;
+    box-shadow: 0 8px 32px rgba(139, 92, 246, 0.18);
+    border: 1.25px solid #3d3d47;
+    padding: 1rem 1.5rem;
+    margin: 0;
+    z-index: 100;
+  }
+  #craftOptions.open {
+    max-height: 740px;
+    opacity: 1;
+  }
+  #craftOptions .craft-field {
+    flex: 1 1 0;
+    min-width: 0;
+    width: 50%;
+    max-width: 50%;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    margin: 0;
+    padding: 0 0.75rem;
+  }
+  #craftOptions .craft-field:first-child {
+    padding-left: 0;
+  }
+  #craftOptions .craft-field:last-child {
+    padding-right: 0;
+  }
+  #craftOptions .mini-select {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    max-height: 200px;
+    height: auto;
+    overflow-y: auto;
+  }
+  @media (max-width: 600px) {
+    #craftOptions {
+      position: fixed;
+      top: 1.25rem;
+      right: 1rem;
+      left: 1rem;
+      width: auto;
+      min-width: 0;
+      max-width: 98vw;
+      height: auto;
+      flex-direction: column;
+      gap: 0.75rem;
+      padding: 1rem 1rem;
+    }
+    #craftOptions .craft-field {
+      width: 100%;
+      max-width: 100%;
+      padding: 0;
+    }
+  }
+
+  #craftOptions label, #craftOptions .checkbox-label {
+    font-size: 1.15rem;
+    padding: 0.5em 0.7em;
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    user-select: none;
+  }
+  #craftOptions input[type="checkbox"] {
+    width: 1.3em;
+    height: 1.3em;
+    margin-right: 0.7em;
+    accent-color: #8b5cf6;
+    border-radius: 6px;
+  }
+  #craftOptions .label {
+    font-size: 1.05rem;
+    margin-bottom: 0.7rem;
+    color: #a78bfa;
+    letter-spacing: 0.7px;
+  }
+  #craftOptions .checkbox-group {
+    margin-bottom: 1.2rem;
+    padding: 0.7rem 0.5rem 0.7rem 0.5rem;
+    border-radius: 10px;
+    background: rgba(139, 92, 246, 0.04);
+  }
+  #craftOptions .checkbox-group:last-child {
+    margin-bottom: 0;
+  }
+  @media (max-width: 600px) {
+    #craftOptions {
+      padding: 1rem 0.5rem;
+      max-width: 98vw;
+    }
+    #craftOptions label, #craftOptions .checkbox-label {
+      font-size: 1rem;
+      padding: 0.4em 0.4em;
+    }
+  }
+
+  .secondary-badges {
+    display: flex;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+    align-items: center;
+  }
+
+  .badge-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
 `; 

@@ -13,26 +13,26 @@ export const clientScript = /*javascript*/ `
 
   // URL sanitization function
   function sanitizeUrl(input) {
-  try {
-    const u = new URL(input);
-    for (const key of Array.from(u.searchParams.keys())) {
-      const lower = key.toLowerCase();
-      if (
-        lower.startsWith("utm_") ||
-        lower === "cmp" ||
-        lower === "fbclid" ||
-        lower === "gclid" ||
-        lower.startsWith("mc_")
-      ) {
-        u.searchParams.delete(key);
+    try {
+      const u = new URL(input);
+      for (const key of Array.from(u.searchParams.keys())) {
+        const lower = key.toLowerCase();
+        if (
+          lower.startsWith("utm_") ||
+          lower === "cmp" ||
+          lower === "fbclid" ||
+          lower === "gclid" ||
+          lower.startsWith("mc_")
+        ) {
+          u.searchParams.delete(key);
+        }
       }
-    }
     // Decode the URL to preserve special characters like é, ñ, etc.
     return decodeURI(u.href);
-  } catch {
-    return input;
+    } catch {
+      return input;
+    }
   }
-}
 
   // Show output group initially with 0 opacity
   outputGroup.style.display = 'block';
@@ -430,7 +430,7 @@ export const clientScript = /*javascript*/ `
       // Set content
       $("out").value = data.text;
       $("title").value = data.title;
-      $("caption").value = data.caption || "";
+      $("caption").value = decode(data.caption || "").replace(/&#8217;/g, "'");
       
       // Handle publication badge
       if (data.publication) {
@@ -937,128 +937,194 @@ export const clientScript = /*javascript*/ `
 
   // 🌐 CRAFT CMS FUNCTIONALITY
 
-  // Make pushToCraft globally available
+  // Function to handle Craft CMS publishing
   window.pushToCraft = async function() {
-    const title = $("title").value;
-    const link = $("link").value;
-    const imagePreview = $("preview");
+    const craftButtonEl = $("craftButton");
+    const originalText = craftButtonEl?.textContent || '🌐 Push to Web'; // Store original text before any changes
     
-    if (!title.trim() || !link.trim()) {
-      alert('Please extract an article first');
-      return;
+    // Check if dropdowns are visible - if not, show them first
+    const craftOptionsEl = $("craftOptions");
+    if (craftOptionsEl && !craftOptionsEl.classList.contains('open')) {
+      console.log("Showing dropdowns!"); // Debug log as requested
+      craftOptionsEl.style.display = 'flex';
+      craftOptionsEl.classList.add('open');
+      craftButtonEl.textContent = 'Send it 🚀';
+      return; // Exit early to wait for user selection
     }
-
-    // Show Craft options if not already visible
-    const craftOptions = $("craftOptions");
-      if (craftOptions.style.display === 'none') {
-    craftOptions.style.display = 'flex';
-      
-      // Animate the appearance
-      gsap.fromTo(craftOptions, 
-        { opacity: 0, y: 20 },
-        { opacity: 1, y: 0, duration: 0.3, ease: "power2.out" }
-      );
-      
-      // Change button text to indicate next step
-      const button = $("craftButton");
-      button.innerHTML = '🌐 Publish<br>Now';
-      return;
-    }
-
-    // Get selected topics and regions
-    const selectedTopics = Array.from(document.querySelectorAll('#topicsSelect input:checked')).map(cb => cb.value);
-    const selectedRegions = Array.from(document.querySelectorAll('#regionsSelect input:checked')).map(cb => cb.value);
     
-    if (selectedTopics.length === 0 || selectedRegions.length === 0) {
-      alert('Please select at least one Topic and one Region before publishing.');
-      return;
-    }
-
-    const button = $("craftButton");
-    const originalText = button.textContent;
-    button.disabled = true;
-    button.textContent = '🌐 Publishing...';
-
     try {
-      // Gather all the data
-      const postData = {
-        headline: title,
-        url: sanitizeUrl(link),
-        publication: publicationName.textContent,
-        articleType: articleType.textContent.toLowerCase(),
-        authors: authorsList.textContent ? [authorsList.textContent] : [],
-        isPaywalled: paywallBadge.classList.contains('paywall-locked'),
-        image: imagePreview.src && imagePreview.style.display !== 'none' ? imagePreview.src : null,
-        topics: selectedTopics,
-        regions: selectedRegions
+      // Get and validate DOM elements first
+      const titleEl = $("title");
+      const urlEl = $("link");
+      const previewEl = $("preview");
+      const publicationNameEl = document.querySelector('.publication-name');
+      const articleTypeEl = document.querySelector('.article-type');
+      const authorsListEl = document.querySelector('.authors-list');
+      const paywallBadgeEl = document.querySelector('.paywall-badge');
+      
+      if (!titleEl || !urlEl || !publicationNameEl || !articleTypeEl) {
+        throw new Error('Some required elements are missing. Please refresh the page and try again.');
+      }
+
+      // Get article data with null checks
+      const articleData = {
+        headline: titleEl.value?.trim() || '',
+        url: sanitizeUrl(urlEl.value?.trim() || ''),
+        publication: publicationNameEl.textContent?.trim() || '',
+        articleType: (articleTypeEl.textContent?.trim() || '').toLowerCase(),
+        authors: authorsListEl?.textContent?.trim() ? [authorsListEl.textContent.trim()] : [],
+        isPaywalled: paywallBadgeEl?.classList?.contains('paywall-locked') || false,
+        image: previewEl?.src || null
       };
 
+      // Topic and Region ID mappings (must match craftApi.js constants)
+      const TOPIC_IDS = {
+        'Canada': 26320,
+        'US': 26836,
+        'International': 26321,
+        'Technology': 26322,
+        'Policy': 26323,
+        'Opinion': 26835,
+        'Research': 37224,
+        'Pharma': 41889,
+        'COVID': 69275,
+        'Business': 69276,
+        'H5N1': 102010
+      };
+
+      const REGION_IDS = {
+        'ATLANTIC': 42385,
+        'NORTH': 46537,
+        'ONTARIO': 47388,
+        'PRAIRIES': 42383,
+        'QUEBEC': 46536,
+        'WEST': 42382
+      };
+
+      // Get topics with defensive checks and convert to IDs
+      const topicInputs = document.querySelectorAll('input[name="articleTopic"]:checked') || [];
+      const selectedTopicLabels = Array.from(topicInputs)
+        .map(cb => cb.value?.trim())
+        .filter(Boolean); // Remove any falsy values
+      
+      const selectedTopicIds = selectedTopicLabels
+        .map(label => TOPIC_IDS[label])
+        .filter(Boolean); // Remove any undefined IDs
+
+      // Get regions with defensive checks (excluding National) and convert to IDs
+      const regionInputs = document.querySelectorAll('input[name="articleRegion"]:checked') || [];
+      const selectedRegionLabels = Array.from(regionInputs)
+        .map(cb => cb.value?.trim())
+        .filter(region => region && region !== 'National'); // Remove National and any falsy values
+      
+      const selectedRegionIds = selectedRegionLabels
+        .map(label => REGION_IDS[label])
+        .filter(Boolean); // Remove any undefined IDs
+
+      // Validate required fields
+      if (!articleData.headline) {
+        throw new Error('Please enter a headline');
+      }
+      if (!articleData.url) {
+        throw new Error('Please enter a URL');
+      }
+      if (!articleData.publication) {
+        throw new Error('Publication name is missing');
+      }
+      if (!articleData.articleType) {
+        throw new Error('Article type is missing');
+      }
+
+      // Add optional fields only if they have values
+      const craftOptions = {
+        authorId: 25385, // Default to Nick Tsergas
+        topics: selectedTopicIds, // Send IDs instead of labels
+        regions: selectedRegionIds // Send IDs instead of labels
+      };
+
+      // Debug log the conversion and payload before submission
+      console.log("Topic conversion:", { 
+        labels: selectedTopicLabels, 
+        ids: selectedTopicIds 
+      });
+      console.log("Region conversion:", { 
+        labels: selectedRegionLabels, 
+        ids: selectedRegionIds 
+      });
+      
+      const payload = { ...articleData, ...craftOptions };
+      console.log("Submitting to Craft with: ", payload);
+
+      // Show loading state
+      craftButtonEl.disabled = true;
+      craftButtonEl.textContent = '📝 Publishing...';
+
+      // Make the API call
       const response = await fetch('/api/craft-post', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify(postData)
+        body: JSON.stringify({
+          ...articleData,
+          ...craftOptions
+        })
       });
 
       const result = await response.json();
 
-      if (result.success) {
-        // Success animation
-        gsap.to(button, {
-          scale: 1.2,
-          duration: 0.3,
-          ease: "back.out(3)",
-          yoyo: true,
-          repeat: 1
-        });
-        button.textContent = '✅ Published!';
-        
-        // Hide craft options after successful publish
-        gsap.to(craftOptions, {
-          opacity: 0,
-          y: -20,
-          duration: 0.3,
-          ease: "power2.in",
-          onComplete: () => {
-            craftOptions.style.display = 'none';
-          }
-        });
-        
-        // Show success message with link
-        if (result.url) {
-          setTimeout(() => {
-            alert(\`Article published successfully!\\n\\nView at: \${result.url}\`);
-          }, 500);
-        }
-        
-        // Reset button after 5 seconds
-        setTimeout(() => {
-          button.innerHTML = '🌐 Push<br>to Web';
-          button.disabled = false;
-        }, 5000);
-      } else {
-        throw new Error(result.error || 'Failed to publish');
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to publish to Craft');
       }
 
-    } catch (error) {
-      console.error('❌ Failed to publish to Craft:', error);
-      button.textContent = "❌ Failed";
-      
-      // Error animation
-      gsap.to(button, {
-        x: [-5, 5, -5, 5, 0],
-        duration: 0.5,
-        ease: "power1.inOut"
+      // Success animation
+      gsap.to(craftButtonEl, {
+        scale: 1.2,
+        duration: 0.3,
+        ease: "back.out(3)",
+        yoyo: true,
+        repeat: 1
       });
+      craftButtonEl.textContent = '✅ Published!';
       
-      alert(\`Failed to publish: \${error.message}\`);
+      // Reset all topic and region checkboxes
+      document.querySelectorAll('input[name="articleTopic"], input[name="articleRegion"]').forEach(cb => {
+        cb.checked = false;
+      });
+      // Hide the checkbox container with slide/collapse
+      const craftOptionsEl = document.getElementById('craftOptions');
+      if (craftOptionsEl) {
+        craftOptionsEl.classList.remove('open');
+      }
       
       // Reset button after 3 seconds
       setTimeout(() => {
-        button.innerHTML = '🌐 Push<br>to Web';
-        button.disabled = false;
+        craftButtonEl.textContent = '🌐 Push to Web'; // Revert to original state
+        craftButtonEl.disabled = false;
       }, 3000);
+
+    } catch (error) {
+      console.error('Craft publishing error:', error);
+      
+      if (craftButtonEl) {
+        craftButtonEl.textContent = "❌ Failed";
+        
+        // Error animation
+        gsap.to(craftButtonEl, {
+          x: [-5, 5, -5, 5, 0],
+          duration: 0.5,
+          ease: "power1.inOut"
+        });
+        
+        // Show error message
+        alert('Failed to publish to Craft: ' + error.message);
+        
+        // Reset button after 3 seconds
+        setTimeout(() => {
+          craftButtonEl.textContent = '🌐 Push to Web'; // Revert to original state
+          craftButtonEl.disabled = false;
+        }, 3000);
+      }
     }
   };
 
@@ -1075,18 +1141,6 @@ export const clientScript = /*javascript*/ `
     if (craftButton && $("title").value.trim()) {
       craftButton.disabled = false;
     }
-    
-    // LinkedIn button temporarily hidden while waiting for API permissions
-    /* const linkedinButton = $("linkedinButton");
-    if (linkedinButton && $("out").value.trim()) {
-      linkedinButton.disabled = false;
-    } */
-
-    // Mastodon button temporarily hidden while waiting for API permissions
-    /* const mastodonButton = $("mastodonButton");
-    if (mastodonButton && $("out").value.trim()) {
-      mastodonButton.disabled = false;
-    } */
   };
 
   // Toggle all regions when "National" is clicked
@@ -1096,6 +1150,68 @@ export const clientScript = /*javascript*/ `
     
     regionCheckboxes.forEach(checkbox => {
       checkbox.checked = isChecked;
+      checkbox.dispatchEvent(new Event('change')); // Trigger any change handlers
     });
   };
+
+  // When showing the popout, use .open for animation
+  const craftButtonEl = $("craftButton");
+  const craftOptionsEl = $("craftOptions");
+  if (craftButtonEl && craftOptionsEl) {
+    craftButtonEl.addEventListener('click', () => {
+      craftOptionsEl.classList.add('open');
+    });
+  }
+
+  // Add close button logic for craftOptions popout
+  window.addEventListener('DOMContentLoaded', () => {
+    const closeBtn = document.getElementById('closeCraftOptions');
+    const craftOptionsEl = document.getElementById('craftOptions');
+    const craftButtonEl = document.getElementById('craftButton');
+    if (closeBtn && craftOptionsEl) {
+      closeBtn.addEventListener('click', () => {
+        // Reset all topic and region checkboxes
+        document.querySelectorAll('input[name="articleTopic"], input[name="articleRegion"]').forEach(cb => {
+          cb.checked = false;
+        });
+        // Reset button text to original state
+        if (craftButtonEl) {
+          craftButtonEl.textContent = '🌐 Push to Web';
+        }
+        // Hide the popout with animation
+        craftOptionsEl.classList.remove('open');
+      });
+    }
+
+    // Add click-outside-to-close functionality
+    document.addEventListener('click', (event) => {
+      if (!craftOptionsEl) return;
+      
+      // Check if the popup is open
+      if (!craftOptionsEl.classList.contains('open')) return;
+      
+      // Check if click was outside the popup and not on the trigger button
+      const craftButton = document.getElementById('craftButton');
+      const clickedInsidePopup = craftOptionsEl.contains(event.target);
+      const clickedOnButton = craftButton && craftButton.contains(event.target);
+      
+      if (!clickedInsidePopup && !clickedOnButton) {
+        // Close popup but keep checkboxes checked (no reset)
+        craftOptionsEl.classList.remove('open');
+      }
+    });
+  });
+
+  // HTML entity decoder for captions (copied from scrapeInfo.js)
+  function decode(s = "") {
+    return s
+      .replace(/&amp;/g, "&")
+      .replace(/&#x27;|&apos;/g, "'")
+      .replace(/&rsquo;?|&lsquo;?/g, "'")
+      .replace(/&rdquo;?|&ldquo;?/g, '"')
+      .replace(/&quot;/g, '"')
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&#(\d+)(?:\s*;)?/g, (_, n) => String.fromCodePoint(+n));
+  }
 `; 
