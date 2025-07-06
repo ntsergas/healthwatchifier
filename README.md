@@ -1,6 +1,6 @@
 # Healthwatch-ifier
 
-A Cloudflare Workers application that helps format health news articles for social media sharing. Built with modern web technologies and deployed on Cloudflare's edge network.
+A Cloudflare Workers web app that parses and re-formats news articles for frictionless social media sharing, with integrated RSS feed generation.
 
 ## Features
 
@@ -14,40 +14,62 @@ A Cloudflare Workers application that helps format health news articles for soci
   - Formatted article text
   - Article title
   - Original URL
-  - Article image (as PNG)
-- 💫 Smooth animations and loading states
-- 📱 Responsive design for all devices
+  - Article image (as PNG or data link)
+- 📰 Automated RSS feed generation
+- 🔄 Multi-platform sharing support:
+  - Bluesky
+  - Mastodon
+  - Craft CMS
 
-## Supported News Sources
+## Unsupported News Sources (known, due to *aggressive* bot-detection)
 
-- CBC News
-- Global News
-- CTV News
-- National Post
-- Montreal Gazette
-- Ottawa Citizen
-- Vancouver Sun
-- Toronto Star
-- Globe and Mail
-- Other Postmedia sites
+- New York Times
+- Reuters
 
 ## Project Structure
+
+The project consists of two Cloudflare Workers:
+
+### Main Worker (healthwatchifier)
 
 ```
 src/
   ├── index.js              # Main Worker entry point
   ├── templates/
-  │   └── html.js          # HTML template
+  │   ├── html.js          # HTML template
+  │   ├── privacy.js       # Privacy policy
+  │   └── data-deletion.js # Data deletion policy
   ├── styles/
   │   └── styles.js        # CSS styles
   ├── client/
   │   └── script.js        # Client-side JavaScript
   ├── api/
-  │   └── healthwatchify.js # API route handler
-  ├── utils/
-  │   ├── scrapeInfo.js    # Article scraping logic
-  │   ├── constants.js     # Shared constants
-  │   └── response.js      # Response helpers
+  │   ├── healthwatchify.js # Main article processing
+  │   ├── bluesky-post.js   # Bluesky integration
+  │   ├── mastodon-post.js  # Mastodon integration
+  │   └── craft-post.js     # Craft CMS integration
+  └── utils/
+      ├── scrapeInfo.js     # Article scraping logic
+      ├── constants.js      # Shared constants
+      ├── response.js       # Response helpers
+      ├── blueskyApi.js     # Bluesky API client
+      ├── mastodonApi.js    # Mastodon API client
+      ├── craftApi.js       # Craft CMS API client
+      ├── htmlEntities.js   # HTML entity handling
+      ├── imageCaptions.js  # Image caption extraction
+      └── browserHeaders.js # Browser header management
+```
+
+### RSS Worker (linkedin-feed-worker)
+
+```
+linkedin-feed-worker/
+  ├── index.js           # RSS Worker entry point
+  ├── api/
+  │   └── linkedin-rss.js # RSS feed management
+  └── utils/
+      ├── rssGenerator.js # RSS feed generation
+      └── logger.js      # Logging utility
 ```
 
 ## Technical Details
@@ -64,10 +86,24 @@ The application handles image processing in several stages:
    - Uses canvas for reliable PNG conversion
    - Implements sequential copying with visual feedback
 
+### RSS Feed
+
+The RSS feed is managed by a dedicated worker for improved reliability and separation of concerns:
+- Maintains a rolling list of the latest articles
+- Includes article titles, links, and preview images
+
 ### API Endpoints
 
+Main Worker:
 - `/api/healthwatchify`: Main article processing endpoint
 - `/api/proxy-image`: CORS-enabled image proxy with caching
+- `/api/bluesky`: Bluesky post creation
+- `/api/mastodon`: Mastodon post creation
+- `/api/craft`: Craft CMS integration
+
+RSS Worker:
+- `/`: Serves the RSS feed
+- `/feed`: Alternative RSS feed endpoint
 
 ## Development
 
@@ -76,17 +112,35 @@ The application handles image processing in several stages:
    npm install
    ```
 
-2. Start the development server:
+2. Start the development servers:
    ```bash
-   wrangler dev
+   # Main worker
+   npx wrangler dev
+   
+   # RSS worker
+   cd linkedin-feed-worker
+   npx wrangler dev
    ```
 
 3. Visit `http://localhost:8787` in your browser
 
+## Code Quality
+
+The project uses several tools to maintain code quality:
+- ESLint for code linting
+- Prettier for code formatting
+- Husky for git hooks
+- lint-staged for pre-commit checks
+
 ## Deployment
 
-Deploy to Cloudflare Workers:
+Deploy both workers to Cloudflare:
 ```bash
+# Main worker
+wrangler deploy
+
+# RSS worker
+cd linkedin-feed-worker
 wrangler deploy
 ```
 
@@ -96,7 +150,4 @@ wrangler deploy
 - Modern JavaScript (ES6+)
 - GSAP for animations
 - Wrangler CLI for development and deployment
-
-## License
-
-MIT License - feel free to use and modify as needed. 
+- Cloudflare KV for RSS feed storage

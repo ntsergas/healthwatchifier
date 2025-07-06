@@ -66,8 +66,8 @@ export const styles = /*css*/ `
     margin: 0.25rem 0 1rem 0;
   }
   button {
-    width: 160px;
-    height: 160px;
+    width: 150px;
+    height: 150px;
     border: none;
     border-radius: 50%;
     background: linear-gradient(135deg, #8b5cf6, #7c3aed);
@@ -322,5 +322,92 @@ export const styles = /*css*/ `
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
+  }
+
+  .social-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 12px;
+    border: none;
+    border-radius: 8px;
+    background: #2d2d2d;
+    color: white;
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s ease;
+    min-width: 100px;
+    text-align: center;
+    line-height: 1.2;
+  }
+
+  #craftButton {
+    padding: 4px 8px;
+    font-size: 13px;
+    min-width: 80px;
+    line-height: 1.1;
+  }
+
+  #craftButton br {
+    margin: 2px 0;
+  }
+
+  .social-button.linkedin-rss {
+    background-color: #0077b5;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: 500;
+    transition: background-color 0.2s;
+  }
+
+  .social-button.linkedin-rss:hover {
+    background-color: #006399;
+  }
+
+  .social-button.linkedin-rss:disabled {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.4), rgba(124, 58, 237, 0.4));
+    cursor: not-allowed;
+    opacity: 0.7;
+  }
+
+  .social-button.linkedin-rss.success {
+    background-color: #28a745;
+  }
+
+  .social-button.linkedin-rss.error {
+    background-color: #dc3545;
+  }
+
+  .social-button.linkedin-rss.circle {
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-left: 8px;
+    font-size: 16px;
+    min-width: unset;
+  }
+
+  .social-button.linkedin-rss.circle:hover {
+    transform: scale(1.1);
+  }
+
+  .social-button.linkedin-rss.circle:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .social-button.linkedin-rss.circle.success {
+    background: #22c55e;
+  }
+
+  .social-button.linkedin-rss.circle.error {
+    background: #ef4444;
   }
 `; 

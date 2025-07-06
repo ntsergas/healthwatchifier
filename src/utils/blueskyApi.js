@@ -219,6 +219,34 @@ export class BlueskyAPI {
   }
 
   /**
+   * Parse data URL if needed
+   */
+  parseDataUrl(dataUrl) {
+    const parts = dataUrl.split(',');
+    if (parts.length !== 2) {
+      throw new Error('Invalid data URL format');
+    }
+    const base64Data = parts[1];
+    const mimeType = parts[0].match(/data:([^;]+)/)?.[1] || 'image/jpeg';
+    return {
+      buffer: Buffer.from(base64Data, 'base64'),
+      mimeType: mimeType
+    };
+  }
+
+  /**
+   * Check if image size exceeds Bluesky's limit and provide helpful error
+   */
+  checkImageSize(buffer) {
+    const MAX_SIZE = 1000000; // 1MB
+    if (buffer.length > MAX_SIZE) {
+      const sizeMB = (buffer.length / 1000000).toFixed(2);
+      throw new Error(`Image size ${sizeMB}MB exceeds Bluesky's 1MB limit. Please use a smaller image or compress it.`);
+    }
+    return buffer;
+  }
+
+  /**
    * Upload image to Bluesky blob storage
    */
   async uploadImage(imageBuffer, mimeType = 'image/jpeg') {
@@ -239,8 +267,15 @@ export class BlueskyAPI {
       });
 
       if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`Image upload failed: ${response.status} ${error}`);
+        const errorText = await response.text();
+        
+        // Check if it's a size limit error
+        if (errorText.includes('too large') || errorText.includes('size') || response.status === 413) {
+          const sizeMB = (imageBuffer.length / 1000000).toFixed(2);
+          throw new Error(`Image upload failed: Image size ${sizeMB}MB exceeds Bluesky's 1MB limit. Please use a smaller image.`);
+        }
+        
+        throw new Error(`Image upload failed: ${response.status} ${errorText}`);
       }
 
       const result = await response.json();
@@ -407,18 +442,36 @@ export class BlueskyAPI {
         return await this.createTextPost(text);
       }
 
-      // Fetch image and create image post
-      blueskyLogger.info('Fetching image for post', { imageUrl });
+      blueskyLogger.info('Processing image for post', { 
+        imageUrl: imageUrl.substring(0, 50) + '...',
+        isDataUrl: imageUrl.startsWith('data:')
+      });
+
+      let imageBuffer, mimeType;
+
+      if (imageUrl.startsWith('data:')) {
+        // Handle data URL (from clipboard/manual upload)
+        const parsed = this.parseDataUrl(imageUrl);
+        imageBuffer = parsed.buffer;
+        mimeType = parsed.mimeType;
+        blueskyLogger.info('Parsed data URL', { mimeType, size: imageBuffer.length });
+      } else {
+        // Handle regular URL (from scraped content)
+        blueskyLogger.info('Fetching image from URL', { imageUrl });
       
       const imageResponse = await fetch(imageUrl);
       if (!imageResponse.ok) {
         throw new Error(`Failed to fetch image: ${imageResponse.statusText}`);
       }
 
-      const imageBuffer = await imageResponse.arrayBuffer();
-      const mimeType = imageResponse.headers.get('content-type') || 'image/jpeg';
+        imageBuffer = new Uint8Array(await imageResponse.arrayBuffer());
+        mimeType = imageResponse.headers.get('content-type') || 'image/jpeg';
+      }
 
-      return await this.createImagePost(text, new Uint8Array(imageBuffer), altText, mimeType);
+              // Check image size and throw helpful error if too large
+        this.checkImageSize(imageBuffer);
+
+        return await this.createImagePost(text, imageBuffer, altText, mimeType);
 
     } catch (error) {
       blueskyLogger.error('Error posting to Bluesky', { error: error.message });

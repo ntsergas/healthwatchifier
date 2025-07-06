@@ -1,21 +1,9 @@
-// import puppeteer from '@cloudflare/puppeteer';
-
 import { PUBLICATION_NAMES, PAYWALLED_DOMAINS, FREE_DOMAINS } from './constants.js';
 import { detectOpinionFromUrl, detectOpinionFromTitle } from './articleTypeDetection.js';
 import { detectAuthorFromHtml } from './authorDetection.js';
 import { logger } from './logger.js';
 import { getSiteOptimizedHeaders } from './browserHeaders.js';
-
-const decode = (s = "") =>
-  s
-    .replace(/&amp;/g, "&")
-    .replace(/&#x27;|&apos;/g, "'")
-    .replace(/&rsquo;?|&lsquo;?/g, "'")
-    .replace(/&rdquo;?|&ldquo;?/g, '"')
-    .replace(/&quot;/g, '"')
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&#(\d+)(?:\s*;)?/g, (_, n) => String.fromCodePoint(+n));
+import { decode } from './htmlEntities.js';
 
 const POSTMEDIA = [
   "nationalpost.com", "montrealgazette.com", "ottawacitizen.com",
@@ -94,6 +82,10 @@ function cleanupHeadline(headline, host) {
   headline = headline.replace(/\s+/g, " ").trim();
   headlineLogger.debug("After whitespace cleanup", { headline });
 
+  // Fix common encoding issues and HTML entities FIRST
+  headline = decode(headline);
+  headlineLogger.debug("After HTML entity decoding", { headline });
+
   // Remove everything after pipe character (including the space before it)
   const pipeIndex = headline.indexOf('|');
   if (pipeIndex !== -1) {
@@ -111,25 +103,21 @@ function cleanupHeadline(headline, host) {
   headline = headline.replace(/\s*:\s*Shots\s*-\s*Health\s+News\s*:\s*NPR\s*$/i, "");
   headlineLogger.debug("After NPR suffix removal", { headline });
 
-  // Remove HTML entity dash suffixes (e.g., "&#x2d; Ars Technica")
-  headline = headline.replace(/\s*&#x2d;\s*Ars Technica\s*$/i, "");
+  // Remove HTML entity dash suffixes (e.g., "&#x2d; Ars Technica") and regular dash suffixes
+  headline = headline.replace(/\s*(?:&#x2d;|-)\s*Ars Technica\s*$/i, "");
   headlineLogger.debug("After HTML entity dash suffix removal", { headline });
 
   // Remove common prefixes
   headline = headline.replace(/^(WATCH|LISTEN|READ|EXCLUSIVE|UPDATE|OPINION|OP-ED|Analysis):\s+/i, "");
   headlineLogger.debug("After prefix removal", { headline });
 
-  // Fix common encoding issues
+  // Final cleanup of remaining pipe and ellipsis patterns
   headline = headline
-    .replace(/[\u2018\u2019]/g, "'")
-    .replace(/[\u201C\u201D]/g, '"')
     .replace(/\s*\|\s*$/g, "")
     .replace(/\s*\.{3,}\s*$/g, "");
-  headlineLogger.debug("After encoding fixes", { headline });
+  headlineLogger.debug("After final cleanup", { headline });
 
-  const final = decode(headline);
-  headlineLogger.debug("Final headline", { final });
-  return final;
+  return headline;
 }
 
 // Helper function to get high quality image URL
@@ -138,6 +126,22 @@ function getHighQualityImageUrl(imgUrl, host) {
   
   try {
     const url = new URL(imgUrl);
+    imageLogger.debug('Processing image URL', { 
+      original: imgUrl,
+      hostname: url.hostname,
+      pathname: url.pathname,
+      search: url.search
+    });
+    
+    // Extract current quality parameters
+    const currentQuality = {
+      width: url.searchParams.get('w') || url.searchParams.get('width'),
+      height: url.searchParams.get('h') || url.searchParams.get('height'),
+      quality: url.searchParams.get('q') || url.searchParams.get('quality'),
+      format: url.pathname.split('.').pop()
+    };
+    
+    imageLogger.debug('Current quality parameters', currentQuality);
     
     // 🎯 TORONTO STAR AND OTHER BLOX SITES (bloximages.chicago2.vip.townnews.com)
     if (url.hostname.includes('bloximages.chicago2.vip.townnews.com')) {
@@ -165,65 +169,111 @@ function getHighQualityImageUrl(imgUrl, host) {
       const separator = processed.includes('?') ? '&' : '?';
       processed += `${separator}resize=1200,800&order=resize`;
       
+      imageLogger.debug('Processed Blox image URL', { 
+        original: imgUrl,
+        processed,
+        changes: 'Added high-quality resize parameters'
+      });
+      
       return processed;
     }
     
     // Postmedia sites
     if (url.hostname.includes('smartcdn.gprod.postmedia.digital')) {
-      return imgUrl.replace(/w=\d+/, 'w=1200')
-                  .replace(/h=\d+/, 'h=800')
-                  .replace(/quality=\d+/, 'quality=90');
+      const processed = imgUrl.replace(/w=\d+/, 'w=1200')
+                            .replace(/h=\d+/, 'h=800')
+                            .replace(/quality=\d+/, 'quality=90');
+      
+      imageLogger.debug('Processed Postmedia image URL', {
+        original: imgUrl,
+        processed,
+        changes: 'Updated width, height, and quality parameters'
+      });
+      
+      return processed;
     }
     
     // The Trillium (Village Media)
     if (url.hostname.includes('vmcdn.ca')) {
-      return imgUrl.replace(/;w=\d+/, ';w=1200')
-                  .replace(/;h=\d+/, ';h=800')
-                  .replace(/;mode=crop/, ';mode=crop')
-                  .replace(/;quality=\d+/, ';quality=85');
+      const processed = imgUrl.replace(/;w=\d+/, ';w=1200')
+                            .replace(/;h=\d+/, ';h=800')
+                            .replace(/;mode=crop/, ';mode=crop')
+                            .replace(/;quality=\d+/, ';quality=85');
+      
+      imageLogger.debug('Processed Village Media image URL', {
+        original: imgUrl,
+        processed,
+        changes: 'Updated width, height, and quality parameters'
+      });
+      
+      return processed;
     }
     
     // CBC
     if (url.hostname.includes('cbc.ca')) {
-      return imgUrl.replace(/\/derivatives\/\w+\//, '/derivatives/16x9_1180/')
-                  .replace(/Resize%3D\d+/, 'Resize%3D1180');
+      const processed = imgUrl.replace(/\/derivatives\/\w+\//, '/derivatives/16x9_1180/')
+                            .replace(/Resize%3D\d+/, 'Resize%3D1180');
+      
+      imageLogger.debug('Processed CBC image URL', {
+        original: imgUrl,
+        processed,
+        changes: 'Updated to high-quality derivative and resize parameter'
+      });
+      
+      return processed;
     }
     
     // Global News
     if (url.hostname.includes('globalnews.ca')) {
-      return imgUrl.replace(/w=\d+/, 'w=1200')
-                  .replace(/h=\d+/, 'h=800')
-                  .replace(/quality=\d+/, 'quality=85');
+      const processed = imgUrl.replace(/w=\d+/, 'w=1200')
+                            .replace(/h=\d+/, 'h=800')
+                            .replace(/quality=\d+/, 'quality=85');
+      
+      imageLogger.debug('Processed Global News image URL', {
+        original: imgUrl,
+        processed,
+        changes: 'Updated width, height, and quality parameters'
+      });
+      
+      return processed;
     }
     
     // Globe and Mail
     if (url.hostname.includes('theglobeandmail.com')) {
-      return imgUrl.replace(/width=\d+/, 'width=1200')
-                  .replace(/quality=\d+/, 'quality=85');
-    }
-    
-    // 🎯 GUARDIAN: Clean and optimize image URLs
-    if (url.hostname.includes('i.guim.co.uk')) {
-      // 🚨 SIGNATURE PRESERVATION: Guardian uses signed URLs
-      // Remove overlay parameters that cause image display issues
-      // Handle both encoded and unencoded versions
-      return imgUrl
-        .replace(/[&?]overlay-align=[^&]*/g, '')
-        .replace(/[&?]overlay-width=[^&]*/g, '')
-        .replace(/[&?]overlay-base64=[^&]*/g, '')
-        // Clean up parameter formatting
-        .replace(/&+/g, '&')
-        .replace(/[&?]$/, '');
+      const processed = imgUrl.replace(/width=\d+/, 'width=1200')
+                            .replace(/quality=\d+/, 'quality=85');
+      
+      imageLogger.debug('Processed Globe and Mail image URL', {
+        original: imgUrl,
+        processed,
+        changes: 'Updated width and quality parameters'
+      });
+      
+      return processed;
     }
     
     // Generic WordPress sites (like Healthy Debate)
     if (imgUrl.includes('wp-content/uploads/')) {
       // Most WordPress installations keep high-res originals
+      imageLogger.debug('WordPress image URL', {
+        original: imgUrl,
+        changes: 'Using original high-res version'
+      });
       return imgUrl;
     }
     
+    // If no specific handling, log and return original
+    imageLogger.debug('No specific quality handling for domain', {
+      original: imgUrl,
+      hostname: url.hostname
+    });
+    
     return imgUrl;
-  } catch {
+  } catch (error) {
+    imageLogger.warn('Error processing image URL', {
+      original: imgUrl,
+      error: error.message
+    });
     return imgUrl;
   }
 }
@@ -320,7 +370,7 @@ function findFirstValidImage(content, url) {
     let imgUrl = imgMatch[1];
     const fullImgTag = imgMatch[0];
     
-    // 🎯 HTML ENTITY DECODING: Fix &#038; and other entities in URLs
+    // 🎯 HTML ENTITY DECODING: Fix entities in URLs using centralized decoder
     imgUrl = decode(imgUrl);
     
     // Skip base64 images (placeholders, lazy loading)

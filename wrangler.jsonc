@@ -1,8 +1,0 @@
-{
-  "name": "healthwatchifier",
-  "main": "src/index.js",
-  "compatibility_date": "2025-05-08",
-  "observability": {
-    "enabled": true
-  }
-} 

@@ -1,4 +1,5 @@
 import { logger } from './logger.js';
+import { decode } from './htmlEntities.js';
 
 const captionLogger = logger.child('CAPTION');
 
@@ -14,19 +15,8 @@ export function cleanupImageCaption(caption) {
   
   let cleaned = caption.trim();
   
-  // Fix HTML entities first
-  cleaned = cleaned
-    .replace(/&#x27;/g, "'")
-    .replace(/&#39;/g, "'")
-    .replace(/&apos;/g, "'")
-    .replace(/&rsquo;/g, "'")
-    .replace(/&lsquo;/g, "'")
-    .replace(/&rdquo;/g, '"')
-    .replace(/&ldquo;/g, '"')
-    .replace(/&quot;/g, '"')
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">");
+  // Decode HTML entities first using centralized decoder
+  cleaned = decode(cleaned);
   
   // Remove "FILE - " prefix
   cleaned = cleaned.replace(/^FILE\s*-\s*/i, '');
@@ -34,14 +24,36 @@ export function cleanupImageCaption(caption) {
   // Remove "WATCH: " prefix
   cleaned = cleaned.replace(/^WATCH:\s*/i, '');
   
-  // Remove anything in parentheses
-  cleaned = cleaned.replace(/\([^)]*\)/g, '');
+  // Remove anything in parentheses (except dates)
+  cleaned = cleaned.replace(/\([^)]*(?<!(?:19|20)\d{2})\)/g, '');
   
-  // Remove "CREDIT" and anything after it
-  cleaned = cleaned.replace(/\s*CREDIT.*/i, '');
+  // Define common agencies for reuse
+  const agencies = '(?:Getty Images|Reuters|AP|Associated Press|AFP|The Canadian Press|Canadian Press)';
   
-  // Remove "Photo by" and anything after it
-  cleaned = cleaned.replace(/\s*Photo by.*/i, '');
+  // Remove photo credits (various formats)
+  cleaned = cleaned
+    // Standard credit styles
+    .replace(/\s*CREDIT.*/i, '')
+    .replace(/\s*Credit:\s*.*/i, '')
+    .replace(/\s*Photo\s+by\s+.*/i, '')
+    .replace(/\s*Photo:\s*.*/i, '')
+    // "Photo: Name / Agency"
+    .replace(new RegExp(`\\s*Photo:\\s*[^/]+\/\\s*(${agencies}).*$`, 'i'), '')
+    // "Photo Name / Agency" without colon
+    .replace(new RegExp(`\\s*Photo\\s+[^\\s]+(?:\\s+[^\\s]+)*\/\\s*(${agencies}).*$`, 'i'), '')
+    // "via Agency"
+    .replace(new RegExp(`\\s+via\\s+(${agencies}).*$`, 'i'), '')
+    // Trailing (Agency)
+    .replace(new RegExp(`\\s*\\((${agencies})\\)\\s*$`, 'i'), '')
+    // Trailing slashes
+    .replace(/\s*\/\s*$/, '');
+
+  // Remove catch-all image/photographer formats
+  cleaned = cleaned
+    .replace(/\s*Image(?:\s+by)?\s+[A-Z][a-z]+\s+[A-Z][a-z]+.*$/i, '');
+  
+  // Remove Canadian Press credit at end (e.g., THE CANADIAN PRESS/Darryl Dyck)
+  cleaned = cleaned.replace(/\s*THE CANADIAN PRESS\/[A-Za-z .'-]+\s*$/i, '');
   
   // Clean up extra whitespace
   cleaned = cleaned.replace(/\s+/g, ' ').trim();
@@ -89,6 +101,14 @@ export function extractImageCaption(html, url) {
       const spanCaptionMatch = html.match(/<figcaption[^>]*>[\s\S]*?<span[^>]*class="[^"]*caption-text[^"]*"[^>]*>([^<]+)<\/span>[\s\S]*?<\/figcaption>/i);
       if (spanCaptionMatch) {
         return cleanupImageCaption(spanCaptionMatch[1]);
+      }
+    }
+    
+    // Axios - look for data-cy="image-caption" with nested p tag
+    if (host.includes('axios.com')) {
+      const axiosCaptionMatch = html.match(/<figcaption[^>]*data-cy="image-caption"[^>]*>[\s\S]*?<p>([^<]+)<\/p>/i);
+      if (axiosCaptionMatch) {
+        return cleanupImageCaption(axiosCaptionMatch[1]);
       }
     }
     

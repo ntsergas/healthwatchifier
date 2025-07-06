@@ -17,7 +17,7 @@ export const htmlTemplate = ({ styles, script }) => /*html*/ `
       display: flex;
       flex-wrap: wrap;
       margin-bottom: 1rem;
-      gap: 0;
+      gap: 18px;
       position: relative;
       z-index: 10; /* Ensure buttons stay above other content */
     }
@@ -26,7 +26,7 @@ export const htmlTemplate = ({ styles, script }) => /*html*/ `
     .button-group .primary-buttons {
       display: flex;
       gap: 18px;
-      margin-right: 37px;
+      margin-right: 76px;
       align-items: center;
     }
     
@@ -345,33 +345,29 @@ export const htmlTemplate = ({ styles, script }) => /*html*/ `
     <div class="content-area">
       <div class="input-section">
         <div class="label">Article URL</div>
-        <input type="url" id="link" placeholder="Paste a news article URL here..." />
+        <input type="url" id="link" placeholder="Put an article link here..." />
       </div>
       <div class="button-group">
         <div class="primary-buttons">
-        <button id="go" title="Press Enter to activate">
+        <button id="go" title="Smash Enter to activate">
           Healthwatch-ify
           <span class="kbd-hint">↵</span>
         </button>
-        <button id="copyAll" title="Press Ctrl+Q to activate">
+        <button id="copyAll" title="Ctrl+Q to activate">
           Copy All
           <span class="kbd-hint">⌃Q</span>
         </button>
         </div>
         <div class="social-buttons">
-          <button id="threadsButton" onclick="postToThreads()" title="Post to Threads" disabled style="display: none;">
-          🧵 Post to Threads
-        </button>
         <button id="blueskyButton" onclick="postToBluesky()" title="Post to Bluesky" disabled>
           🦋 Post to Bluesky
         </button>
-          <button id="linkedinButton" onclick="postToLinkedIn()" title="Post to LinkedIn" disabled style="display: none;">
-            💼 Post to LinkedIn
-          </button>
-          <button id="mastodonButton" onclick="postToMastodon()" title="Post to Mastodon" disabled>
+        <button id="mastodonButton" onclick="postToMastodon()" title="Post to Mastodon" disabled>
             🐘 Post to Mastodon
           </button>
-          <button id="craftButton" onclick="pushToCraft()" title="Push to Web" disabled>
+          <button id="linkedinRssButton" class="social-button linkedin-rss" onclick="postToLinkedInRSS()" title="Post to LinkedIn (RSS)" disabled>RSS ⇢<br>LinkedIn 💼</button>
+          <button id="emptyFeedButton" class="social-button linkedin-rss circle" onclick="emptyLinkedInFeed()" title="Empty LinkedIn Feed">🗑️</button>
+                    <button id="craftButton" onclick="pushToCraft()" title="Push to Web" disabled>
             🌐 Push<br>to Web
           </button>
         </div>

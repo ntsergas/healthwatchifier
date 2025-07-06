@@ -1,3 +1,5 @@
+import { decode } from '../utils/htmlEntities.js';
+
 export const clientScript = /*javascript*/ `
   const $ = id => document.getElementById(id);
   const outputGroup = document.querySelector('.output-group');
@@ -10,6 +12,58 @@ export const clientScript = /*javascript*/ `
   const paywallStatus = paywallBadge.querySelector('.paywall-status');
   const removeImageBtn = $("removeImage");
   const addImagePlaceholder = $("addImagePlaceholder");
+
+  // HTML entity decoder
+  function decode(str = "") {
+    return str
+      // Standard HTML entities
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&quot;/g, '"')
+      
+      // Quotes and apostrophes (both named and numeric)
+      .replace(/&#x27;|&apos;/g, "'")
+      .replace(/&rsquo;?|&lsquo;?/g, "'")
+      .replace(/&rdquo;?|&ldquo;?/g, '"')
+      .replace(/&#8217;/g, "'")
+      .replace(/&#8220;|&#8221;/g, '"')
+      .replace(/&bdquo;|&ldquo;/g, '"')
+      
+      // Unicode smart quotes
+      .replace(/[\u2018\u2019]/g, "'")
+      .replace(/[\u201C\u201D]/g, '"')
+      
+      // Hyphens and dashes
+      .replace(/&#x2d;/g, "-")
+      .replace(/&mdash;|&#8212;/g, "—")
+      .replace(/&ndash;|&#8211;/g, "–")
+      
+      // Special spaces
+      .replace(/&nbsp;|&#160;/g, " ")
+      .replace(/&ensp;/g, " ")
+      .replace(/&emsp;/g, " ")
+      
+      // Common accents
+      .replace(/&eacute;/g, "é")
+      .replace(/&egrave;/g, "è")
+      .replace(/&uuml;/g, "ü")
+      .replace(/&ntilde;/g, "ñ")
+      
+      // French characters
+      .replace(/&ccedil;/g, "ç")
+      .replace(/&Ccedil;/g, "Ç")
+      .replace(/&acirc;/g, "â")
+      .replace(/&ecirc;/g, "ê")
+      .replace(/&icirc;/g, "î")
+      .replace(/&ocirc;/g, "ô")
+      .replace(/&ucirc;/g, "û")
+      .replace(/&euml;/g, "ë")
+      
+      // Any other numeric entities (decimal or hex)
+      .replace(/&#(\\d+)(?:\\s*;)?/g, (_, n) => String.fromCodePoint(+n))
+      .replace(/&#x([0-9a-f]+)(?:\\s*;)?/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)));
+  }
 
   // URL sanitization function
   function sanitizeUrl(input) {
@@ -253,10 +307,18 @@ export const clientScript = /*javascript*/ `
         for (const type of clipboardItem.types) {
           if (type.startsWith('image/')) {
             const blob = await clipboardItem.getType(type);
-            const url = URL.createObjectURL(blob);
+            
+            // Convert blob to base64 data URL so it can be sent to server
+            const reader = new FileReader();
+            const dataUrlPromise = new Promise((resolve) => {
+              reader.onload = () => resolve(reader.result);
+              reader.readAsDataURL(blob);
+            });
+            
+            const dataUrl = await dataUrlPromise;
             
             const preview = $("preview");
-            preview.src = url;
+            preview.src = dataUrl; // Use data URL instead of blob URL
             preview.style.display = "block";
             preview.style.opacity = 0;
             preview.style.transform = "scale(0.95) translateY(10px)";
@@ -429,8 +491,8 @@ export const clientScript = /*javascript*/ `
 
       // Set content
       $("out").value = data.text;
-      $("title").value = data.title;
-      $("caption").value = decode(data.caption || "").replace(/&#8217;/g, "'");
+      $("title").value = decode(data.title || "");
+      $("caption").value = decode(data.caption || "");
       
       // Handle publication badge
       if (data.publication) {
@@ -686,12 +748,6 @@ export const clientScript = /*javascript*/ `
     }
   };
 
-
-  // Post to LinkedIn function
-  async function postToLinkedIn() {
-    await postToSocialMedia('linkedin-post', 'LinkedIn');
-  }
-
   // Post to Bluesky function
   window.postToBluesky = async function() {
     const output = $("out").value;
@@ -812,90 +868,6 @@ export const clientScript = /*javascript*/ `
       paywallBadge.classList.add(data.isPaywalled ? 'paywall-locked' : 'paywall-free');
       setTimeout(() => paywallBadge.classList.add('visible'), 100);
     }
-
-    // ... existing code ...
-  }
-
-  // 🧵 THREADS FUNCTIONALITY
-
-  // Make postToThreads globally available
-  window.postToThreads = async function() {
-    const title = $("title").value;
-    const imagePreview = $("preview");
-    const caption = $("caption").value;
-    
-    if (!title.trim()) {
-      alert('Please extract an article first');
-      return;
-    }
-
-    const button = $("threadsButton");
-    const originalText = button.textContent;
-    button.disabled = true;
-    button.textContent = '🧵 Posting...';
-
-    try {
-      const postData = {
-        headline: title,
-        imageUrl: imagePreview.src && imagePreview.style.display !== 'none' ? imagePreview.src : null,
-        caption: caption || ''
-      };
-
-      const response = await fetch('/api/threads-post', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(postData)
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        // Success animation
-        gsap.to(button, {
-          scale: 1.2,
-          duration: 0.3,
-          ease: "back.out(3)",
-          yoyo: true,
-          repeat: 1
-        });
-        button.textContent = '✅ Posted!';
-        
-        // Reset button after 3 seconds
-        setTimeout(() => {
-          button.textContent = originalText;
-          button.disabled = false;
-        }, 3000);
-      } else {
-        throw new Error(result.error || 'Failed to post');
-      }
-
-    } catch (error) {
-      console.error('❌ Failed to post to Threads:', error);
-      button.textContent = "❌ Failed";
-      
-      // Error animation
-      gsap.to(button, {
-        x: [-5, 5, -5, 5, 0],
-        duration: 0.5,
-        ease: "power1.inOut"
-      });
-      
-      // Reset button after 3 seconds
-      setTimeout(() => {
-        button.textContent = originalText;
-        button.disabled = false;
-      }, 3000);
-    }
-  };
-
-  // Enable Threads button when content is loaded
-  function enableThreadsButton() {
-    const button = $("threadsButton");
-    if (button && $("title").value.trim()) {
-      button.disabled = false;
-    }
   }
 
   // Enable Bluesky button when content is loaded
@@ -910,29 +882,27 @@ export const clientScript = /*javascript*/ `
   const originalOnclick = $("go").onclick;
   $("go").onclick = async function() {
     await originalOnclick.call(this);
-    // Enable Threads button when content is loaded
+    
+    // Enable all buttons when content is loaded
     const threadsButton = $("threadsButton");
     if (threadsButton && $("title").value.trim()) {
       threadsButton.disabled = false;
     }
     
-    // Enable Bluesky button when content is loaded
     const blueskyButton = $("blueskyButton");
     if (blueskyButton && $("out").value.trim()) {
       blueskyButton.disabled = false;
     }
     
-    // Enable Craft button when content is loaded
     const craftButton = $("craftButton");
     if (craftButton && $("title").value.trim()) {
       craftButton.disabled = false;
     }
-    
-    // LinkedIn button temporarily hidden while waiting for API permissions
-    /* const linkedinButton = $("linkedinButton");
-    if (linkedinButton && $("out").value.trim()) {
-      linkedinButton.disabled = false;
-    } */
+
+    const linkedinRssButton = $("linkedinRssButton");
+    if (linkedinRssButton && $("title").value.trim() && $("link").value.trim()) {
+      linkedinRssButton.disabled = false;
+    }
   };
 
   // 🌐 CRAFT CMS FUNCTIONALITY
@@ -1141,6 +1111,12 @@ export const clientScript = /*javascript*/ `
     if (craftButton && $("title").value.trim()) {
       craftButton.disabled = false;
     }
+
+    // Enable LinkedIn RSS button when content is loaded
+    const linkedinRssButton = $("linkedinRssButton");
+    if (linkedinRssButton && $("title").value.trim() && $("link").value.trim()) {
+      linkedinRssButton.disabled = false;
+    }
   };
 
   // Toggle all regions when "National" is clicked
@@ -1202,16 +1178,146 @@ export const clientScript = /*javascript*/ `
     });
   });
 
-  // HTML entity decoder for captions (copied from scrapeInfo.js)
-  function decode(s = "") {
-    return s
-      .replace(/&amp;/g, "&")
-      .replace(/&#x27;|&apos;/g, "'")
-      .replace(/&rsquo;?|&lsquo;?/g, "'")
-      .replace(/&rdquo;?|&ldquo;?/g, '"')
-      .replace(/&quot;/g, '"')
-      .replace(/&lt;/g, "<")
-      .replace(/&gt;/g, ">")
-      .replace(/&#(\d+)(?:\s*;)?/g, (_, n) => String.fromCodePoint(+n));
-  }
+  // LinkedIn Feed functionality
+  window.postToLinkedInRSS = async function() {
+    const title = $("title").value;
+    const link = $("link").value;
+    const imagePreview = $("preview");
+    
+    if (!title.trim() || !link.trim()) {
+      alert('Please extract an article first');
+      return;
+    }
+
+    const button = $("linkedinRssButton");
+    const originalText = button.textContent;
+    button.disabled = true;
+    button.textContent = '🔄 Posting...';
+
+    try {
+      // Only include image if it's visible and has a valid URL
+      let imageUrl = null;
+      if (imagePreview && imagePreview.style.display !== 'none' && imagePreview.src) {
+        // Skip data URLs
+        if (!imagePreview.src.startsWith('data:')) {
+          imageUrl = imagePreview.src;
+        }
+      }
+
+      const postData = {
+        title: title.trim(),
+        link: link.trim(),
+        tagline: "More news → CanadaHealthwatch.ca 🍁",
+        image: imageUrl
+      };
+
+      console.log('Sending to LinkedIn feed:', postData);
+
+      const response = await fetch('https://feed.strikethroughediting.ca/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(postData)
+      });
+
+      if (!response.ok) {
+        const error = await response.text();
+        throw new Error(error || 'Failed to post to LinkedIn feed');
+      }
+
+        // Success animation
+        gsap.to(button, {
+          scale: 1.2,
+          duration: 0.3,
+          ease: "back.out(3)",
+          yoyo: true,
+          repeat: 1
+        });
+        button.textContent = '✅ Posted!';
+      button.style.background = "#22c55e";
+        
+        // Reset button after 3 seconds
+        setTimeout(() => {
+          button.textContent = originalText;
+          button.disabled = false;
+        button.style.background = "";
+        }, 3000);
+
+    } catch (error) {
+      console.error('❌ Failed to post to LinkedIn feed:', error);
+      button.textContent = "❌ Failed";
+      
+      // Error animation
+      gsap.to(button, {
+        x: [-5, 5, -5, 5, 0],
+        duration: 0.5,
+        ease: "power1.inOut"
+      });
+      
+      // Reset button after 3 seconds
+      setTimeout(() => {
+        button.textContent = originalText;
+        button.disabled = false;
+      }, 3000);
+    }
+  };
+
+  // Empty LinkedIn Feed functionality
+  window.emptyLinkedInFeed = async function() {
+    const button = $("emptyFeedButton");
+    const originalText = button.textContent;
+    button.disabled = true;
+    button.textContent = '🔄 Emptying...';
+
+    try {
+      const response = await fetch('https://feed.strikethroughediting.ca/empty', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to empty feed');
+      }
+
+      // Success animation
+      gsap.to(button, {
+        scale: 1.2,
+        duration: 0.3,
+        ease: "back.out(3)",
+        yoyo: true,
+        repeat: 1
+      });
+      button.textContent = '✅';
+      button.classList.add('success');
+      
+      // Reset button after 3 seconds
+      setTimeout(() => {
+        button.textContent = originalText;
+      button.disabled = false;
+        button.classList.remove('success');
+      }, 3000);
+
+    } catch (error) {
+      console.error('❌ Failed to empty LinkedIn feed:', error);
+      button.textContent = "❌ Failed";
+      button.classList.add('error');
+      
+      // Error animation
+      gsap.to(button, {
+        x: [-5, 5, -5, 5, 0],
+        duration: 0.5,
+        ease: "power1.inOut"
+      });
+      
+      // Reset button after 3 seconds
+      setTimeout(() => {
+        button.textContent = originalText;
+        button.disabled = false;
+        button.classList.remove('error');
+      }, 3000);
+    }
+  };
 `; 

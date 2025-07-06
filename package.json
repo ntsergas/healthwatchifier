@@ -1,14 +1,41 @@
 {
 	"name": "healthwatchifier",
-	"version": "1.0.0",
-	"description": "A Cloudflare Workers application that helps format health news articles for social media sharing",
+	"version": "5.0.0",
+	"description": "A Cloudflare Workers web app that re-formats health news articles for frictionless sharing",
 	"main": "src/index.js",
+	"type": "module",
 	"scripts": {
 		"dev": "wrangler dev",
 		"deploy": "wrangler deploy",
-		"test": "node test.unit.js"
+		"format": "prettier --write '**/*.{js,css,json,md}'",
+		"lint": "eslint src/",
+		"prepare": "husky install"
 	},
-	"keywords": ["health", "news", "social-media", "cloudflare-workers", "canada"],
+	"keywords": [
+		"health",
+		"news",
+		"social-media",
+		"cloudflare-workers",
+		"canada"
+	],
 	"author": "",
-	"license": "MIT"
+	"license": "MIT",
+	"devDependencies": {
+		"eslint": "^8.57.0",
+		"husky": "^9.0.11",
+		"lint-staged": "^15.2.2",
+		"prettier": "^3.2.5",
+		"wrangler": "^4.23.0"
+	},
+	"lint-staged": {
+		"*.{js,css,json,md}": [
+			"prettier --write"
+		],
+		"*.js": [
+			"eslint --fix"
+		]
+	},
+	"dependencies": {
+		"node-fetch": "^3.3.2"
+	}
 }

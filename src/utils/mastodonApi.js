@@ -80,6 +80,13 @@ export class MastodonAPI {
         mimeType 
       });
 
+      // Check image size against Mastodon's 16MB limit
+      const MAX_SIZE = 16000000; // 16MB
+      if (mediaBuffer.length > MAX_SIZE) {
+        const sizeMB = (mediaBuffer.length / 1000000).toFixed(2);
+        throw new Error(`Image size ${sizeMB}MB exceeds Mastodon's 16MB limit. Please use a smaller image.`);
+      }
+
       // Create form data for the upload
       const formData = new FormData();
       const blob = new Blob([mediaBuffer], { type: mimeType });
@@ -98,8 +105,23 @@ export class MastodonAPI {
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        throw new Error(`Media upload failed: ${error.error || response.statusText}`);
+        let errorMessage = `Media upload failed: ${response.status}`;
+        
+        try {
+          const error = await response.json();
+          errorMessage = `Media upload failed: ${error.error || response.statusText}`;
+          
+          // Check if it's a size limit error
+          if (error.error && (error.error.includes('too large') || error.error.includes('size') || response.status === 413)) {
+            const sizeMB = (mediaBuffer.length / 1000000).toFixed(2);
+            errorMessage = `Media upload failed: Image size ${sizeMB}MB exceeds server limits. Please use a smaller image.`;
+          }
+        } catch (parseError) {
+          // If we can't parse the error response, use the status text
+          errorMessage = `Media upload failed: ${response.status} ${response.statusText}`;
+        }
+        
+        throw new Error(errorMessage);
       }
 
       const result = await response.json();
@@ -110,6 +132,29 @@ export class MastodonAPI {
     } catch (error) {
       mastodonLogger.error('Error uploading media', { error: error.message });
       throw error;
+    }
+  }
+
+  /**
+   * Convert data URL to buffer and mime type
+   */
+  parseDataUrl(dataUrl) {
+    const [header, data] = dataUrl.split(',');
+    const mimeType = header.match(/data:([^;]+)/)?.[1] || 'image/jpeg';
+    const isBase64 = header.includes('base64');
+    
+    if (isBase64) {
+      const binaryString = atob(data);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+      return { buffer: bytes, mimeType };
+    } else {
+      // Handle URL-encoded data URLs (less common)
+      const decoded = decodeURIComponent(data);
+      const bytes = new TextEncoder().encode(decoded);
+      return { buffer: bytes, mimeType };
     }
   }
 
@@ -129,21 +174,34 @@ export class MastodonAPI {
 
       mastodonLogger.info('Creating media post', { 
         textLength: text.length,
-        imageUrl 
+        imageUrl: imageUrl.substring(0, 50) + '...',
+        isDataUrl: imageUrl.startsWith('data:')
       });
 
-      // First fetch the image
-      const imageResponse = await fetch(imageUrl);
-      if (!imageResponse.ok) {
-        throw new Error(`Failed to fetch image: ${imageResponse.statusText}`);
-      }
+      let imageBuffer, mimeType;
 
-      const imageBuffer = await imageResponse.arrayBuffer();
-      const mimeType = imageResponse.headers.get('content-type') || 'image/jpeg';
+      if (imageUrl.startsWith('data:')) {
+        // Handle data URL (from clipboard/manual upload)
+        const parsed = this.parseDataUrl(imageUrl);
+        imageBuffer = parsed.buffer;
+        mimeType = parsed.mimeType;
+        mastodonLogger.info('Parsed data URL', { mimeType, size: imageBuffer.length });
+      } else {
+        // Handle regular URL (from scraped content)
+        mastodonLogger.info('Fetching image from URL', { imageUrl });
+        
+        const imageResponse = await fetch(imageUrl);
+        if (!imageResponse.ok) {
+          throw new Error(`Failed to fetch image: ${imageResponse.statusText}`);
+        }
+
+        imageBuffer = new Uint8Array(await imageResponse.arrayBuffer());
+        mimeType = imageResponse.headers.get('content-type') || 'image/jpeg';
+      }
 
       // Upload the media first
       const mediaId = await this.uploadMedia(
-        new Uint8Array(imageBuffer),
+        imageBuffer,
         altText,
         mimeType
       );

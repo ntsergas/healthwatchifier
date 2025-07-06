@@ -1,0 +1,11 @@
+name = "linkedin-feed-worker"
+main = "index.js"
+compatibility_date = "2025-07-04"
+
+[[kv_namespaces]]
+binding = "LINKEDIN_FEED"
+id = "5bc12df991a346f1bdfac19f7f8e2eaf"
+
+[[routes]]
+pattern = "https://feed.strikethroughediting.ca/*"
+zone_id = "8171e44a5c73e1d88505de99f0bd4334"

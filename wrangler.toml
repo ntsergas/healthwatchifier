@@ -1,27 +1,17 @@
 name = "healthwatchifier"
 main = "src/index.js"
-compatibility_date = "2025-05-08"
-type = "javascript"
-node_compat = true
+compatibility_date = "2025-07-04"
+compatibility_flags = ["nodejs_compat"]
 
-# Enable observability
+routes = [
+  "strikethroughediting.ca/*",
+  "www.strikethroughediting.ca/*"
+]
+
 [observability]
 enabled = true
 
-# Build configuration
-[build]
-command = "npm run build"
-watch_dir = "src"
-
-# Environment variables for Threads API
-[vars]
-THREADS_APP_ID = "1260867418730773"
-LINKEDIN_APP_ID = "223810124"
-
-# Secure credentials stored as Cloudflare secrets:
-# wrangler secret put THREADS_APP_SECRET
-# wrangler secret put BLUESKY_HANDLE
-# wrangler secret put BLUESKY_APP_PASSWORD 
-# wrangler secret put LINKEDIN_ACCESS_TOKEN
-# wrangler secret put LINKEDIN_PERSON_ID
-# wrangler secret put CRAFT_API_TOKEN 
+[[kv_namespaces]]
+binding = "LINKEDIN_FEED"
+id = "5bc12df991a346f1bdfac19f7f8e2eaf"
+preview_id = "5bc12df991a346f1bdfac19f7f8e2eaf"

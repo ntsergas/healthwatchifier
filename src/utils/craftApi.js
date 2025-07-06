@@ -288,13 +288,48 @@ export class CraftAPI {
   }
 
 /**
+ * Convert data URL to a temporary upload that Craft can access
+ * @param {string} dataUrl - Base64 data URL
+ * @param {string} filename - Desired filename
+ * @returns {Promise<string>} - Temporary URL that Craft can fetch
+ */
+async processDataUrl(dataUrl, filename) {
+  // For data URLs, we need to convert them to something Craft can access
+  // Since Craft expects a URL it can fetch, we'll use a different approach
+  
+  // Extract the base64 data and mime type
+  const [header, data] = dataUrl.split(',');
+  const mimeType = header.match(/data:([^;]+)/)?.[1] || 'image/jpeg';
+  
+  craftLogger.info('Processing data URL for Craft upload', {
+    filename,
+    mimeType,
+    dataSize: data?.length || 0
+  });
+  
+  // Craft CMS requires fetchable URLs for image uploads via GraphQL.
+  // Data URLs (base64 encoded images) cannot be fetched by Craft's image processing system.
+  // The article will still be created, but without the manually uploaded image.
+  throw new Error(
+    'Manual image uploads cannot be sent to Craft CMS due to technical limitations. ' +
+    'Craft requires images to be accessible via URL, but manually uploaded images are only available in your browser. ' +
+    'The article will be created without the image - you can add it manually in Craft CMS if needed.'
+  );
+}
+
+/**
  * Upload an image to Craft's Images CDN via GraphQL
  * Tries folderId 38 ("articles/") first, falls back to 37 (root) if needed
- * @param {string} imageUrl - Remote image URL
+ * @param {string} imageUrl - Remote image URL or data URL
  * @param {string} filename - Desired filename
  * @returns {Promise<Object>} - The created asset
  */
 async uploadImage(imageUrl, filename) {
+  // Handle data URLs differently
+  if (imageUrl.startsWith('data:')) {
+    return await this.processDataUrl(imageUrl, filename);
+  }
+
   const mutation = `
     mutation UploadImage($_file: FileInput!, $newFolderId: ID) {
       save_imagesCDN_Asset(
