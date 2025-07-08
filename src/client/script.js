@@ -13,6 +13,76 @@ export const clientScript = /*javascript*/ `
   const removeImageBtn = $("removeImage");
   const addImagePlaceholder = $("addImagePlaceholder");
 
+  // Global helper to play sound with optional pitch
+  function playHealthwatchSfx(pitch = 1.0) {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const source = audioCtx.createBufferSource();
+
+    fetch(window.healthwatchifySfxBase64) // Don't add prefix - it's already included
+      .then(res => res.arrayBuffer())
+      .then(arrayBuffer => audioCtx.decodeAudioData(arrayBuffer))
+      .then(audioBuffer => {
+        source.buffer = audioBuffer;
+        source.playbackRate.value = pitch; // 1.0 is normal speed
+        source.connect(audioCtx.destination);
+        source.start(0);
+      })
+      .catch(err => console.error("Audio playback failed:", err));
+  }
+
+    function playHealthwatchifyEchoSfx(pitch = 0.83, offsetSeconds = 0.0) {
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+
+  const gain = ctx.createGain();
+  gain.gain.value = 0.28;
+
+  const delay = ctx.createDelay();
+  delay.delayTime.value = 0.23;
+
+  const feedback = ctx.createGain();
+  feedback.gain.value = 0.35;
+
+  delay.connect(feedback);
+  feedback.connect(delay);
+
+  gain.connect(delay);
+  delay.connect(ctx.destination);
+  gain.connect(ctx.destination);
+  feedback.connect(ctx.destination);
+
+  fetch(window.healthwatchifySfxBase64)
+    .then(res => res.arrayBuffer())
+    .then(buf => ctx.decodeAudioData(buf))
+    .then(buffer => {
+      const source = ctx.createBufferSource();
+      source.buffer = buffer;
+      source.playbackRate.value = pitch;
+      source.connect(gain);
+      source.start(0, offsetSeconds);
+    })
+    .catch(err => console.error("Echo SFX error:", err));
+}
+
+  // Push to Web sound effect
+function playPushToWebSfx(pitch = 1.0, offsetSeconds = 0.0) {
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const source = audioCtx.createBufferSource();
+  const gainNode = audioCtx.createGain();
+  gainNode.gain.value = 0.28; // Match healthwatchify volume
+
+  fetch("data:audio/wav;base64," + window.pushToWebSfx)
+    .then(res => res.arrayBuffer())
+    .then(arrayBuffer => audioCtx.decodeAudioData(arrayBuffer))
+    .then(audioBuffer => {
+      source.buffer = audioBuffer;
+      source.playbackRate.value = pitch;
+      source.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      source.start(0, offsetSeconds); // 👈 Starts at chosen offset
+    })
+    .catch(err => console.error("Push-to-Web sound error:", err));
+}
+
   // HTML entity decoder
   function decode(str = "") {
     return str
@@ -401,6 +471,9 @@ export const clientScript = /*javascript*/ `
       button.textContent = "✓ Posted!";
       button.style.background = "#22c55e";
       
+      // Play Push to Web success sound with offset
+      playPushToWebSfx(0.79, 0.21);
+      
       // Reset after 2 seconds
       setTimeout(() => {
         button.disabled = false;
@@ -485,7 +558,7 @@ export const clientScript = /*javascript*/ `
       gsap.to(outputGroup, {
         opacity: 1,
         y: 0,
-        duration: 0.6,
+        duration: 0.9,
         ease: "back.out(1.4)"
       });
 
@@ -550,6 +623,7 @@ export const clientScript = /*javascript*/ `
       }
       $("out").style.opacity = 1;
       outputGroup.classList.add('visible');
+      playHealthwatchifyEchoSfx(0.83, 0.0);
 
       // Update social buttons state after content is loaded
       updateSocialButtonsState();
@@ -593,6 +667,7 @@ export const clientScript = /*javascript*/ `
       // 1. Copy Caption if exists
       if (caption) {
         await navigator.clipboard.writeText(caption);
+        playHealthwatchSfx(0.65); // Caption - lowest pitch
         button.textContent = "Caption Copied!";
         gsap.to(button, {
           scale: 1.15,
@@ -606,6 +681,7 @@ export const clientScript = /*javascript*/ `
 
       // 2. Copy Output
       await navigator.clipboard.writeText(output);
+      playHealthwatchSfx(0.75); // Output
       button.textContent = "Output Copied!";
       gsap.to(button, {
         scale: 1.15,
@@ -619,6 +695,7 @@ export const clientScript = /*javascript*/ `
       // 3. Copy Publication if exists
       if (publication && publicationBadge.style.display !== 'none') {
         await navigator.clipboard.writeText(publication);
+        playHealthwatchSfx(0.85); // Outlet
         button.textContent = "Outlet Copied!";
         gsap.to(button, {
           scale: 1.15,
@@ -633,6 +710,7 @@ export const clientScript = /*javascript*/ `
       // 4. Copy Authors if exist
       if (authors && authorsBadge.style.display !== 'none') {
         await navigator.clipboard.writeText(authors);
+        playHealthwatchSfx(0.95); // Authors
         button.textContent = "Authors Copied!";
         gsap.to(button, {
           scale: 1.15,
@@ -647,6 +725,7 @@ export const clientScript = /*javascript*/ `
       // 5. Copy Title if exists
       if (title) {
         await navigator.clipboard.writeText(title);
+        playHealthwatchSfx(1.05); // Title
         button.textContent = "Title Copied!";
         gsap.to(button, {
           scale: 1.15,
@@ -661,6 +740,7 @@ export const clientScript = /*javascript*/ `
       // 6. Copy URL if exists
       if (url) {
         await navigator.clipboard.writeText(url);
+        playHealthwatchSfx(1.15); // URL - normal pitch
         button.textContent = "URL Copied!";
         gsap.to(button, {
           scale: 1.15,
@@ -707,6 +787,7 @@ export const clientScript = /*javascript*/ `
             })
           ]);
           
+          playHealthwatchSfx(1.25); // Image - highest pitch
           button.textContent = "Image Copied!";
           gsap.to(button, {
             scale: 1.15,
@@ -789,6 +870,9 @@ export const clientScript = /*javascript*/ `
       
       if (result.success) {
         blueskyButton.textContent = "✅ Posted!";
+        
+        // Play Push to Web success sound with offset
+        playPushToWebSfx(1.18, 0.29);
         
         // Reset button after 3 seconds
         setTimeout(() => {
@@ -1057,6 +1141,9 @@ export const clientScript = /*javascript*/ `
       });
       craftButtonEl.textContent = '✅ Published!';
       
+      // Play the Push to Web success sound with offset
+      playPushToWebSfx(1.06, 0.25);
+      
       // Reset all topic and region checkboxes
       document.querySelectorAll('input[name="articleTopic"], input[name="articleRegion"]').forEach(cb => {
         cb.checked = false;
@@ -1235,13 +1322,21 @@ export const clientScript = /*javascript*/ `
           repeat: 1
         });
         button.textContent = '✅ Posted!';
-      button.style.background = "#22c55e";
+        button.style.background = "#22c55e";
+
+        // Play Push to Web success sound with offset
+        playPushToWebSfx(0.96, 0.25);
+
+        // Nudge LinkedIn to re-fetch RSS preview
+        fetch("https://www.linkedin.com/checkpoint/rp/rss-link-preview?feedUrl=https://feed.strikethroughediting.ca")
+          .then(() => console.log("✅ LinkedIn scraper nudge sent"))
+          .catch(err => console.error("⚠️ LinkedIn scraper nudge failed:", err));
         
         // Reset button after 3 seconds
         setTimeout(() => {
           button.textContent = originalText;
           button.disabled = false;
-        button.style.background = "";
+          button.style.background = "";
         }, 3000);
 
     } catch (error) {
@@ -1293,10 +1388,13 @@ export const clientScript = /*javascript*/ `
       button.textContent = '✅';
       button.classList.add('success');
       
+      // Play sound effect at lower pitch for empty/trash action
+      playHealthwatchSfx(0.38);
+      
       // Reset button after 3 seconds
       setTimeout(() => {
         button.textContent = originalText;
-      button.disabled = false;
+        button.disabled = false;
         button.classList.remove('success');
       }, 3000);
 

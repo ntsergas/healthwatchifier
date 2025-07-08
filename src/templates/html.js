@@ -1,3 +1,6 @@
+import { healthwatchifySfxBase64 } from './sound.js';
+import { pushToWebSfx } from './pushToWebSfx.js';
+
 export const htmlTemplate = ({ styles, script }) => /*html*/ `
 <!DOCTYPE html>
 <html lang="en">
@@ -446,7 +449,24 @@ export const htmlTemplate = ({ styles, script }) => /*html*/ `
       </div>
     </div>
   </div>
-  <script>${script}</script>
+  <script>
+  // Make the base64 audio data available globally
+  window.healthwatchifySfxBase64 = "${healthwatchifySfxBase64}";
+  window.pushToWebSfx = "${pushToWebSfx}";
+  
+  ${script}
+document.getElementById("go")?.addEventListener("click", () => {
+  const sfx = document.getElementById("healthwatchify-sfx");
+  if (sfx) {
+    sfx.volume = 0.33;
+    sfx.currentTime = 0;
+    sfx.play().catch(err => console.error("Audio failed:", err));
+  }
+});
+  </script>
+  <audio id="healthwatchify-sfx" preload="auto">
+  <source src="${healthwatchifySfxBase64}" type="audio/wav" />
+</audio>
 </body>
 </html>
 `; 

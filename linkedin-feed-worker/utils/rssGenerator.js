@@ -16,12 +16,11 @@ const RSS_LIMITS = {
  * @throws {Error} If validation fails
  */
 function validateRSSData(data) {
-  const { title, link, tagline, image } = data;
+  const { title, link, image } = data;
   
   rssLogger.debug('Validating RSS data', { 
     hasTitle: !!title, 
     hasLink: !!link, 
-    hasTagline: !!tagline,
     hasImage: !!image,
     imageType: image ? (image.startsWith('data:') ? 'data-url' : 'regular-url') : 'none'
   });
@@ -29,7 +28,6 @@ function validateRSSData(data) {
   // Check required fields
   if (!title?.trim()) throw new Error('Title is required');
   if (!link?.trim()) throw new Error('Link is required');
-  if (!tagline?.trim()) throw new Error('Tagline is required');
   if (!image?.trim()) throw new Error('Image is required');
   
   // Check field lengths
@@ -79,7 +77,7 @@ export function generateRSSFeed(items) {
      xmlns:atom="http://www.w3.org/2005/Atom"
      xmlns:content="http://purl.org/rss/1.0/modules/content/">
   <channel>
-    <title>Canada Healthwatch</title>
+    <title>Healthwatch-ifier</title>
     <link>https://canadahealthwatch.ca</link>
     <description>The latest health news curated by Canada Healthwatch</description>
     <language>en-ca</language>

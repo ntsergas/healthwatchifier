@@ -181,8 +181,8 @@ function getHighQualityImageUrl(imgUrl, host) {
     // Postmedia sites
     if (url.hostname.includes('smartcdn.gprod.postmedia.digital')) {
       const processed = imgUrl.replace(/w=\d+/, 'w=1200')
-                            .replace(/h=\d+/, 'h=800')
-                            .replace(/quality=\d+/, 'quality=90');
+                  .replace(/h=\d+/, 'h=800')
+                  .replace(/quality=\d+/, 'quality=90');
       
       imageLogger.debug('Processed Postmedia image URL', {
         original: imgUrl,
@@ -196,9 +196,9 @@ function getHighQualityImageUrl(imgUrl, host) {
     // The Trillium (Village Media)
     if (url.hostname.includes('vmcdn.ca')) {
       const processed = imgUrl.replace(/;w=\d+/, ';w=1200')
-                            .replace(/;h=\d+/, ';h=800')
-                            .replace(/;mode=crop/, ';mode=crop')
-                            .replace(/;quality=\d+/, ';quality=85');
+                  .replace(/;h=\d+/, ';h=800')
+                  .replace(/;mode=crop/, ';mode=crop')
+                  .replace(/;quality=\d+/, ';quality=85');
       
       imageLogger.debug('Processed Village Media image URL', {
         original: imgUrl,
@@ -212,7 +212,7 @@ function getHighQualityImageUrl(imgUrl, host) {
     // CBC
     if (url.hostname.includes('cbc.ca')) {
       const processed = imgUrl.replace(/\/derivatives\/\w+\//, '/derivatives/16x9_1180/')
-                            .replace(/Resize%3D\d+/, 'Resize%3D1180');
+                  .replace(/Resize%3D\d+/, 'Resize%3D1180');
       
       imageLogger.debug('Processed CBC image URL', {
         original: imgUrl,
@@ -226,8 +226,8 @@ function getHighQualityImageUrl(imgUrl, host) {
     // Global News
     if (url.hostname.includes('globalnews.ca')) {
       const processed = imgUrl.replace(/w=\d+/, 'w=1200')
-                            .replace(/h=\d+/, 'h=800')
-                            .replace(/quality=\d+/, 'quality=85');
+                  .replace(/h=\d+/, 'h=800')
+                  .replace(/quality=\d+/, 'quality=85');
       
       imageLogger.debug('Processed Global News image URL', {
         original: imgUrl,
@@ -241,7 +241,7 @@ function getHighQualityImageUrl(imgUrl, host) {
     // Globe and Mail
     if (url.hostname.includes('theglobeandmail.com')) {
       const processed = imgUrl.replace(/width=\d+/, 'width=1200')
-                            .replace(/quality=\d+/, 'quality=85');
+                  .replace(/quality=\d+/, 'quality=85');
       
       imageLogger.debug('Processed Globe and Mail image URL', {
         original: imgUrl,

@@ -3,24 +3,25 @@ import { generateRSSFeed, validateRSSData } from '../utils/rssGenerator.js';
 
 const rssLogger = logger.child('LinkedIn RSS');
 
-function generateGuidFromLink(link) {
+async function generateGuidFromLink(link) {
   try {
-    const url = new URL(link);
-    const parts = url.pathname.split('/').filter(Boolean);
-    const slug = parts.pop();
-    const date = new Date().toISOString().split('T')[0];
-    return `${slug}-${date}`;
+    const encoder = new TextEncoder();
+    const data = encoder.encode(link);
+    const hashBuffer = await crypto.subtle.digest('SHA-1', data);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    return `guid-${hashHex}`;
   } catch (err) {
     return `unknown-${Date.now()}`;
   }
 }
 
-function generateRSSItem({ title, link, tagline, image }) {
+function generateRSSItem({ title, link, image }) {
   rssLogger.debug('🔍 Generating RSS item', { title, link, imagePresent: !!image });
   const pubDate = new Date().toUTCString();
   const guid = generateGuidFromLink(link);
-  // Format: headline<space>link<space>tagline
-  const description = `${title} ${link} ${tagline}`;
+  // Format: headline<space>link
+  const description = `${title}`;
 
   // Log the image URL before escaping
   rssLogger.debug('🔍 Processing image URL', { 
@@ -69,7 +70,7 @@ export async function addToLinkedInFeed(data, env) {
     
     // Extract existing items
     const itemsMatch = feedContent.match(/<item>[\s\S]*?<\/item>/g) || [];
-    const items = [newItem, ...itemsMatch.slice(0, 14)]; // Keep last 15 items
+    const items = [newItem, ...itemsMatch.slice(0, 49)]; // Keep last 50 items
     
     // Generate new feed
     const newFeed = generateRSSFeed(items);
